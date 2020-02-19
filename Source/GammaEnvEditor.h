@@ -35,6 +35,8 @@ struct GammaEnvParameters
 struct GammaEnvEditor : public Component
 {
 public:
+  static constexpr int WIDTH = 590;
+
   GammaEnvEditor(AudioProcessorValueTreeState& apvts,
                  GammaEnvParameters& parameters,
                  String const& midSideParamID = "Mid-Side");
@@ -48,5 +50,4 @@ public:
   LinkableControl<AttachedSlider> release;
   LinkableControl<AttachedSlider> attackDelay;
   LinkableControl<AttachedSlider> releaseDelay;
-  Label stereoLinkLabel{ {}, "Stereo Link" };
 };

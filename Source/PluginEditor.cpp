@@ -62,20 +62,20 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
   addAndMakeVisible(splineEditor);
   addAndMakeVisible(nodeEditor);
+  addAndMakeVisible(inputGain);
+  addAndMakeVisible(outputGain);
+  addAndMakeVisible(gammaEnvEditor);
+  addAndMakeVisible(vuMeter);
+  addAndMakeVisible(topologyLabel);
+  addAndMakeVisible(stereoLinkLabel);
+  addAndMakeVisible(oversamplingLabel);
+  addAndMakeVisible(oversampling);
+  addAndMakeVisible(linearPhase);
 
   AttachSplineEditorsAndInitialize(splineEditor, nodeEditor);
 
-  addAndMakeVisible(inputGain);
-  addAndMakeVisible(outputGain);
-
   inputGain.tableSettings.drawLeftVericalLine = false;
   outputGain.tableSettings.drawLeftVericalLine = false;
-
-  addAndMakeVisible(gammaEnvEditor);
-
-  addAndMakeVisible(vuMeter);
-
-  addAndMakeVisible(topologyLabel);
 
   midSideEditor.getControl().setButtonText("Mid-Side");
 
@@ -83,12 +83,10 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
     splineEditor.vuMeter[c] = &processor.levelVuMeterResults[c];
   }
 
-  addAndMakeVisible(oversampling);
-  addAndMakeVisible(linearPhase);
-
   linearPhase.setButtonText("Linear Phase");
+
   for (int i = 0; i <= 5; ++i) {
-    oversampling.addItem(std::to_string(1 << i) + "x Oversampling", i + 1);
+    oversampling.addItem(std::to_string(1 << i) + "x", i + 1);
   }
 
   auto const OnOversamplingChange = [this] {
@@ -121,52 +119,57 @@ CurvessorAudioProcessorEditor::paint(Graphics& g)
 void
 CurvessorAudioProcessorEditor::resized()
 {
-  splineEditor.setTopLeftPosition(0, 0);
-  splineEditor.setSize(400, 400);
+  constexpr int offset = 10;
+  constexpr int rowHeight = 30;
+  constexpr int splineEditorSide = 500;
+  constexpr int vuMeterWidth = 90;
+  constexpr int nodeEditorHeight = 120;
 
-  nodeEditor.setTopLeftPosition(0, 400);
-  nodeEditor.setSize(600, 200);
+  splineEditor.setTopLeftPosition(offset, offset);
+  splineEditor.setSize(splineEditorSide, splineEditorSide);
 
-  float gammaEnvEditorRight = getWidth() - 200;
-  float rowHeight = 30.f;
+  vuMeter.setTopLeftPosition(splineEditorSide + 2 * offset, offset);
+  vuMeter.setSize(vuMeterWidth, splineEditorSide);
 
-  gammaEnvEditor.setTopLeftPosition(0, 600);
-  gammaEnvEditor.setSize(getWidth() - 200, rowHeight * 4);
+  nodeEditor.setTopLeftPosition(offset, splineEditorSide + 2 * offset);
+  nodeEditor.setSize(splineEditorSide + offset + vuMeterWidth, 200);
 
-  inputGain.setTopLeftPosition(gammaEnvEditorRight, 600);
+  int const gammaEnvEditorY = splineEditorSide + nodeEditorHeight + 3 * offset;
+  gammaEnvEditor.setTopLeftPosition(
+    offset, splineEditorSide + nodeEditorHeight + 3 * offset);
+  gammaEnvEditor.setSize(GammaEnvEditor::WIDTH, rowHeight * 4);
+
+  inputGain.setTopLeftPosition(offset + GammaEnvEditor::WIDTH, gammaEnvEditorY);
   inputGain.setSize(100, rowHeight * 4);
-  outputGain.setTopLeftPosition(gammaEnvEditorRight + 100, 600);
+  outputGain.setTopLeftPosition(offset + GammaEnvEditor::WIDTH + 100,
+                                gammaEnvEditorY);
   outputGain.setSize(100, rowHeight * 4);
-
-  vuMeter.setTopLeftPosition(410, 0);
-  vuMeter.setSize(90, 400);
 
   Grid grid;
   using Track = Grid::TrackInfo;
 
-  grid.templateRows = { Track(1_fr), Track(1_fr) };
-  grid.templateColumns = { Track(1_fr), Track(1_fr) };
+  grid.templateRows = { Track(1_fr), Track(1_fr), Track(1_fr), Track(1_fr),
+                        Track(1_fr), Track(1_fr), Track(1_fr), Track(1_fr) };
+
+  grid.templateColumns = { Track(1_fr) };
 
   grid.items = { GridItem(topologyLabel),
-                 GridItem(gammaEnvEditor.stereoLinkLabel),
                  GridItem(topologyEditor.getControl()),
-                 GridItem(stereoLink.getControl()) };
+                 GridItem(midSideEditor.getControl()),
+                 GridItem(stereoLinkLabel),
+                 GridItem(stereoLink.getControl()),
+                 GridItem(oversamplingLabel),
+                 GridItem(oversampling),
+                 GridItem(linearPhase) };
 
-  grid.performLayout(juce::Rectangle<int>(0, 750, 300.f, 100.f));
+  grid.performLayout(juce::Rectangle<int>(
+    splineEditorSide + vuMeterWidth + 3 * offset, 0, 100.f, 280.f));
 
-  midSideEditor.getControl().setTopLeftPosition(500, 750);
-  midSideEditor.getControl().setSize(200, 40);
-
-  oversampling.setTopLeftPosition(600, 750);
-  oversampling.setSize(200, 40);
-  linearPhase.setTopLeftPosition(600, 850);
-  linearPhase.setSize(200, 40);
-
-  splineEditor.areaInWhichToDrawNodes =
-    juce::Rectangle(splineEditor.getPosition().x,
-                    splineEditor.getPosition().x,
-                    jmax(splineEditor.getWidth(), nodeEditor.getWidth()),
-                    nodeEditor.getPosition().y + nodeEditor.getHeight());
+  splineEditor.areaInWhichToDrawNodes = juce::Rectangle(
+    splineEditor.getPosition().x,
+    splineEditor.getPosition().x,
+    jmax(splineEditor.getWidth(), nodeEditor.getWidth()),
+    nodeEditor.getPosition().y + nodeEditor.getHeight() + offset);
 }
 
 void
