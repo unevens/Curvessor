@@ -47,6 +47,7 @@ class CurvessorAudioProcessor : public AudioProcessor
     LinkableParameter<AudioParameterFloat> inputGain;
     LinkableParameter<AudioParameterFloat> outputGain;
     GammaEnvParameters envelopeFollower;
+    AudioParameterFloat* stereoLink;
     std::unique_ptr<SplineParameters> spline;
 
     std::unique_ptr<AudioProcessorValueTreeState> apvts;

@@ -30,24 +30,16 @@ struct GammaEnvParameters
   LinkableParameter<AudioParameterFloat> attackDelay;
   LinkableParameter<AudioParameterFloat> releaseDelay;
   LinkableParameter<AudioParameterChoice> metric;
-  AudioParameterFloat* stereoLink;
 };
 
-struct GammaEnvEditor
+struct GammaEnvEditor : public Component
 {
 public:
-  GammaEnvEditor(Component& owner,
-                 AudioProcessorValueTreeState& apvts,
+  GammaEnvEditor(AudioProcessorValueTreeState& apvts,
                  GammaEnvParameters& parameters,
                  String const& midSideParamID = "Mid-Side");
 
-  virtual ~GammaEnvEditor();
-
-  void resizeLinkables(Point<float> topLeft,
-                       float width,
-                       float height,
-                       float columnGap = 2.f,
-                       float rowGap = 2.f);
+  void resized() override;
 
   ChannelLabels channelLabels;
 
@@ -56,9 +48,5 @@ public:
   LinkableControl<AttachedSlider> release;
   LinkableControl<AttachedSlider> attackDelay;
   LinkableControl<AttachedSlider> releaseDelay;
-  AttachedSlider stereoLink;
   Label stereoLinkLabel{ {}, "Stereo Link" };
-
-private:
-  Component& owner;
 };

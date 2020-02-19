@@ -19,47 +19,48 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "GammaEnvEditor.h"
 
-GammaEnvEditor::GammaEnvEditor(Component& owner,
-                               AudioProcessorValueTreeState& apvts,
+GammaEnvEditor::GammaEnvEditor(AudioProcessorValueTreeState& apvts,
                                GammaEnvParameters& parameters,
                                String const& midSideParamID)
-  : attack(owner, apvts, "Attack", parameters.attack)
-  , release(owner, apvts, "Release", parameters.release)
-  , releaseDelay(owner, apvts, "Release Delay", parameters.releaseDelay)
-  , attackDelay(owner, apvts, "Attack Delay", parameters.attackDelay)
-  , metric(owner, apvts, "Metric", { "Peak", "RMS" }, parameters.metric)
-  , stereoLink(owner, apvts, parameters.stereoLink->paramID)
-  , channelLabels(owner, apvts, midSideParamID)
-  , owner(owner)
+  : attack(apvts, "Attack", parameters.attack)
+  , release(apvts, "Release", parameters.release)
+  , releaseDelay(apvts, "Release Delay", parameters.releaseDelay)
+  , attackDelay(apvts, "Attack Delay", parameters.attackDelay)
+  , metric(apvts, "Metric", { "Peak", "RMS" }, parameters.metric)
+  , channelLabels(apvts, midSideParamID)
 {
-  owner.addAndMakeVisible(stereoLinkLabel);
-}
-
-GammaEnvEditor::~GammaEnvEditor()
-{
-  owner.removeChildComponent(&stereoLinkLabel);
+  addAndMakeVisible(attack);
+  addAndMakeVisible(release);
+  addAndMakeVisible(releaseDelay);
+  addAndMakeVisible(attackDelay);
+  addAndMakeVisible(metric);
+  addAndMakeVisible(channelLabels);
+  attack.tableSettings.drawLeftVericalLine = false;
+  release.tableSettings.drawLeftVericalLine = false;
+  releaseDelay.tableSettings.drawLeftVericalLine = false;
+  attackDelay.tableSettings.drawLeftVericalLine = false;
+  metric.tableSettings.drawLeftVericalLine = false;
+  setSize(600.f, 120.f);
 }
 
 void
-GammaEnvEditor::resizeLinkables(Point<float> topLeft,
-                                float width,
-                                float rowHeight,
-                                float columnGap,
-                                float rowGap)
+GammaEnvEditor::resized()
 {
-  float const columnWidth = (width - 6.f * columnGap) / 6.f;
-  float const gap = columnWidth + columnGap;
+  int left = 0.f;
 
-  channelLabels.resize(topLeft, columnWidth, rowHeight, rowGap);
-  topLeft.x += gap;
-  metric.resize(topLeft, columnWidth, rowHeight, rowGap);
-  topLeft.x += gap;
-  attack.resize(topLeft, columnWidth, rowHeight, rowGap);
-  topLeft.x += gap;
-  release.resize(topLeft, columnWidth, rowHeight, rowGap);
-  topLeft.x += gap;
-  attackDelay.resize(topLeft, columnWidth, rowHeight, rowGap);
-  topLeft.x += gap;
-  releaseDelay.resize(topLeft, columnWidth, rowHeight, rowGap);
-  topLeft.x += gap;
+  auto const resize = [&](auto& component, int width) {
+    component.setTopLeftPosition(left, 0.f);
+    component.setSize(width, getHeight());
+    left += width;
+  };
+
+  resize(channelLabels, 50);
+
+  int width = std::round(((float)getWidth() - 50.f) / 5.f);
+
+  resize(metric, width);
+  resize(attack, width);
+  resize(release, width);
+  resize(attackDelay, width);
+  resize(releaseDelay, width);
 }

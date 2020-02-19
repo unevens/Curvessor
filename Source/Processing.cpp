@@ -290,6 +290,8 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
     resetFlag = true;
   }
 
+  stereoLinkTarget[0] = 0.01 * parameters.stereoLink->get();
+
   resetFlag = resetFlag || parameters.spline->needsReset();
 
   auto spline = parameters.spline->updateSpline(splines);

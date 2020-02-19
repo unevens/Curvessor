@@ -34,8 +34,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   , nodeEditor(*p.GetCurvessorParameters().spline,
                *p.GetCurvessorParameters().apvts)
 
-  , gammaEnvEditor(*this,
-                   *p.GetCurvessorParameters().apvts,
+  , gammaEnvEditor(*p.GetCurvessorParameters().apvts,
                    p.GetCurvessorParameters().envelopeFollower)
 
   , midSideEditor(*this, *p.GetCurvessorParameters().apvts, "Mid-Side")
@@ -50,20 +49,29 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
             36.f,
             [](float x) { return std::pow(x, 1.f / 2.f); })
 
-  , inputGain(*this,
-              *p.GetCurvessorParameters().apvts,
+  , inputGain(*p.GetCurvessorParameters().apvts,
               "Input Gain",
               p.GetCurvessorParameters().inputGain)
 
-  , outputGain(*this,
-               *p.GetCurvessorParameters().apvts,
+  , outputGain(*p.GetCurvessorParameters().apvts,
                "Output Gain",
                p.GetCurvessorParameters().outputGain)
+
+  , stereoLink(*this, *p.GetCurvessorParameters().apvts, "Stereo-Link")
 {
+
   addAndMakeVisible(splineEditor);
   addAndMakeVisible(nodeEditor);
 
   AttachSplineEditorsAndInitialize(splineEditor, nodeEditor);
+
+  addAndMakeVisible(inputGain);
+  addAndMakeVisible(outputGain);
+
+  inputGain.tableSettings.drawLeftVericalLine = false;
+  outputGain.tableSettings.drawLeftVericalLine = false;
+
+  addAndMakeVisible(gammaEnvEditor);
 
   addAndMakeVisible(vuMeter);
 
@@ -121,12 +129,14 @@ CurvessorAudioProcessorEditor::resized()
 
   float gammaEnvEditorRight = getWidth() - 200;
   float rowHeight = 30.f;
-  gammaEnvEditor.resizeLinkables(
-    { 0, 600 }, getWidth() - 200, rowHeight, 2.f, 2.f);
 
-  inputGain.resize({ gammaEnvEditorRight, 600.f }, 100, rowHeight, 2.f);
-  outputGain.resize(
-    { gammaEnvEditorRight + 100.f, 600.f }, 100, rowHeight, 2.f);
+  gammaEnvEditor.setTopLeftPosition(0, 600);
+  gammaEnvEditor.setSize(getWidth() - 200, rowHeight * 4);
+
+  inputGain.setTopLeftPosition(gammaEnvEditorRight, 600);
+  inputGain.setSize(100, rowHeight * 4);
+  outputGain.setTopLeftPosition(gammaEnvEditorRight + 100, 600);
+  outputGain.setSize(100, rowHeight * 4);
 
   vuMeter.setTopLeftPosition(410, 0);
   vuMeter.setSize(90, 400);
@@ -140,7 +150,7 @@ CurvessorAudioProcessorEditor::resized()
   grid.items = { GridItem(topologyLabel),
                  GridItem(gammaEnvEditor.stereoLinkLabel),
                  GridItem(topologyEditor.getControl()),
-                 GridItem(gammaEnvEditor.stereoLink.getControl()) };
+                 GridItem(stereoLink.getControl()) };
 
   grid.performLayout(juce::Rectangle<int>(0, 750, 300.f, 100.f));
 

@@ -48,6 +48,7 @@ private:
   Label topologyLabel{ {}, "Topology" };
   ToggleButton linearPhase;
   ComboBox oversampling;
+  AttachedSlider stereoLink;
   LinkableControl<AttachedSlider> inputGain;
   LinkableControl<AttachedSlider> outputGain;
   void timerCallback() override;

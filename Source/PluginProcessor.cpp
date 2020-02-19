@@ -100,7 +100,7 @@ CurvessorAudioProcessor::Parameters::Parameters(
   envelopeFollower.metric =
     CreateLinkableChoiceParameters("Metric", { "Peak", "RMS" });
 
-  envelopeFollower.stereoLink =
+  stereoLink =
     CreateFloatParameter("Stereo-Link", 50.0, 0.0, 100.0);
 
   spline = std::unique_ptr<SplineParameters>(
