@@ -1,0 +1,6 @@
+[submodule "oversimple"]
+	path = oversimple
+	url = https://github.com/unevens/oversimple
+[submodule "juicy"]
+	path = juicy
+	url = https://github.com/unevens/juicy
