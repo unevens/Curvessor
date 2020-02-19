@@ -57,10 +57,10 @@ GammaEnvEditor::resized()
   resize(channelLabels, 40);
 
   resize(metric, 90);
-  resize(attack, 135);
-  resize(release, 135);
-  resize(attackDelay, 135);
-  resize(releaseDelay, 135);
+  resize(attack, 140);
+  resize(release, 140);
+  resize(attackDelay, 140);
+  resize(releaseDelay, 140);
 }
 
 void
