@@ -44,6 +44,7 @@ private:
   GammaEnvEditor gammaEnvEditor;
   GainVuMeter vuMeter;
   AttachedToggle midSideEditor;
+  Label midSideLabel{ {}, "Mid-Side" };
   AttachedComboBox topologyEditor;
   Label topologyLabel{ {}, "Topology" };
   ToggleButton linearPhase;
@@ -53,6 +54,11 @@ private:
   Label stereoLinkLabel{ {}, "Stereo Link" };
   LinkableControl<AttachedSlider> inputGain;
   LinkableControl<AttachedSlider> outputGain;
+  ChannelLabels inputGainLabels;
+  ChannelLabels outputGainLabels;
+
+  static inline Colour lineColour = Colours::black;
+
   void timerCallback() override;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CurvessorAudioProcessorEditor)

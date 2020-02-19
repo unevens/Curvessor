@@ -58,6 +58,10 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
                p.GetCurvessorParameters().outputGain)
 
   , stereoLink(*this, *p.GetCurvessorParameters().apvts, "Stereo-Link")
+
+  , inputGainLabels(*p.GetCurvessorParameters().apvts, "Mid-Side")
+
+  , outputGainLabels(*p.GetCurvessorParameters().apvts, "Mid-Side")
 {
 
   addAndMakeVisible(splineEditor);
@@ -71,13 +75,21 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   addAndMakeVisible(oversamplingLabel);
   addAndMakeVisible(oversampling);
   addAndMakeVisible(linearPhase);
+  addAndMakeVisible(inputGainLabels);
+  addAndMakeVisible(outputGainLabels);
+  addAndMakeVisible(midSideLabel);
 
   AttachSplineEditorsAndInitialize(splineEditor, nodeEditor);
 
-  inputGain.tableSettings.drawLeftVericalLine = false;
-  outputGain.tableSettings.drawLeftVericalLine = false;
+  topologyLabel.setFont(Font(20, Font::bold));
+  oversamplingLabel.setFont(Font(20, Font::bold));
+  stereoLinkLabel.setFont(Font(20, Font::bold));
+  midSideLabel.setFont(Font(20, Font::bold));
 
-  midSideEditor.getControl().setButtonText("Mid-Side");
+  topologyLabel.setJustificationType(Justification::centred);
+  oversamplingLabel.setJustificationType(Justification::centred);
+  stereoLinkLabel.setJustificationType(Justification::centred);
+  midSideLabel.setJustificationType(Justification::centred);
 
   for (int c = 0; c < 2; ++c) {
     splineEditor.vuMeter[c] = &processor.levelVuMeterResults[c];
@@ -102,7 +114,18 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   linearPhase.onClick = OnOversamplingChange;
   oversampling.onChange = OnOversamplingChange;
 
-  setSize(1000, 900);
+  auto tableSettings = LinkableControlTable{};
+  tableSettings.lineColour = lineColour;
+  gammaEnvEditor.setTableSettings(tableSettings);
+  nodeEditor.setTableSettings(tableSettings);
+  inputGain.tableSettings.drawLeftVericalLine = false;
+  outputGain.tableSettings.drawLeftVericalLine = false;
+  inputGain.tableSettings.lineColour = lineColour;
+  outputGain.tableSettings.lineColour = lineColour;
+  outputGainLabels.tableSettings.lineColour = lineColour;
+  inputGainLabels.tableSettings.lineColour = lineColour;
+
+  setSize(804, 890);
 
   startTimer(250);
 }
@@ -114,16 +137,22 @@ void
 CurvessorAudioProcessorEditor::paint(Graphics& g)
 {
   g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
+
+  g.setColour(Colours::black);
+  g.drawRect(630, 10, 160, 330, 2);
+  g.drawLine(631, 90, 790, 90, 2);
+  g.drawLine(631, 155, 790, 155, 2);
+  g.drawLine(631, 230, 790, 230, 2);
 }
 
 void
 CurvessorAudioProcessorEditor::resized()
 {
   constexpr int offset = 10;
-  constexpr int rowHeight = 30;
+  constexpr int rowHeight = 40;
   constexpr int splineEditorSide = 500;
   constexpr int vuMeterWidth = 90;
-  constexpr int nodeEditorHeight = 120;
+  constexpr int nodeEditorHeight = 160;
 
   splineEditor.setTopLeftPosition(offset, offset);
   splineEditor.setSize(splineEditorSide, splineEditorSide);
@@ -132,38 +161,74 @@ CurvessorAudioProcessorEditor::resized()
   vuMeter.setSize(vuMeterWidth, splineEditorSide);
 
   nodeEditor.setTopLeftPosition(offset, splineEditorSide + 2 * offset);
-  nodeEditor.setSize(splineEditorSide + offset + vuMeterWidth, 200);
+  nodeEditor.setSize(splineEditorSide + offset + vuMeterWidth, 160);
 
   int const gammaEnvEditorY = splineEditorSide + nodeEditorHeight + 3 * offset;
   gammaEnvEditor.setTopLeftPosition(
     offset, splineEditorSide + nodeEditorHeight + 3 * offset);
   gammaEnvEditor.setSize(GammaEnvEditor::WIDTH, rowHeight * 4);
 
-  inputGain.setTopLeftPosition(offset + GammaEnvEditor::WIDTH, gammaEnvEditorY);
-  inputGain.setSize(100, rowHeight * 4);
-  outputGain.setTopLeftPosition(offset + GammaEnvEditor::WIDTH + 100,
-                                gammaEnvEditorY);
-  outputGain.setSize(100, rowHeight * 4);
+  int const gainLeft = 3 * offset + splineEditorSide + vuMeterWidth;
+  int const inputGainTop = 350;
+
+  inputGainLabels.setTopLeftPosition(gainLeft, inputGainTop);
+  inputGainLabels.setSize(40, 160);
+
+  inputGain.setTopLeftPosition(gainLeft + 40, inputGainTop);
+  inputGain.setSize(135, 160);
+
+  int const outputGainTop = inputGainTop + 160 + offset;
+
+  outputGainLabels.setTopLeftPosition(gainLeft, outputGainTop);
+  outputGainLabels.setSize(40, 160);
+
+  outputGain.setTopLeftPosition(gainLeft + 40, outputGainTop);
+  outputGain.setSize(135, 160);
 
   Grid grid;
   using Track = Grid::TrackInfo;
 
-  grid.templateRows = { Track(1_fr), Track(1_fr), Track(1_fr), Track(1_fr),
-                        Track(1_fr), Track(1_fr), Track(1_fr), Track(1_fr) };
+  grid.templateRows = { Track(40_px), Track(40_px), Track(40_px),
+                        Track(30_px), Track(30_px), Track(40_px),
+                        Track(40_px), Track(40_px), Track(30_px) };
 
   grid.templateColumns = { Track(1_fr) };
 
   grid.items = { GridItem(topologyLabel),
-                 GridItem(topologyEditor.getControl()),
-                 GridItem(midSideEditor.getControl()),
+                 GridItem(topologyEditor.getControl())
+                   .withWidth(100)
+                   .withHeight(30)
+                   .withAlignSelf(GridItem::AlignSelf::center)
+                   .withJustifySelf(GridItem::JustifySelf::center),
+                 GridItem(midSideLabel),
+                 GridItem(midSideEditor.getControl())
+                   .withWidth(30)
+                   .withAlignSelf(GridItem::AlignSelf::center)
+                   .withJustifySelf(GridItem::JustifySelf::center),
                  GridItem(stereoLinkLabel),
-                 GridItem(stereoLink.getControl()),
+                 GridItem(stereoLink.getControl())
+                   .withWidth(135)
+                   .withAlignSelf(GridItem::AlignSelf::center)
+                   .withJustifySelf(GridItem::JustifySelf::center),
                  GridItem(oversamplingLabel),
-                 GridItem(oversampling),
-                 GridItem(linearPhase) };
+                 GridItem(oversampling)
+                   .withWidth(70)
+                   .withAlignSelf(GridItem::AlignSelf::center)
+                   .withJustifySelf(GridItem::JustifySelf::center),
+                 GridItem(linearPhase)
+                   .withWidth(120)
+                   .withAlignSelf(GridItem::AlignSelf::center)
+                   .withJustifySelf(GridItem::JustifySelf::center) };
 
-  grid.performLayout(juce::Rectangle<int>(
-    splineEditorSide + vuMeterWidth + 3 * offset, 0, 100.f, 280.f));
+  grid.justifyContent = Grid::JustifyContent::center;
+  grid.alignContent = Grid::AlignContent::center;
+
+  grid.performLayout(juce::Rectangle(
+    splineEditorSide + vuMeterWidth + 3 * offset + 15, offset + 5, 150, 310));
+
+  stereoLink.getControl().setTopLeftPosition(
+    stereoLink.getControl().getPosition().x + 10,
+    stereoLink.getControl().getPosition().y);
 
   splineEditor.areaInWhichToDrawNodes = juce::Rectangle(
     splineEditor.getPosition().x,

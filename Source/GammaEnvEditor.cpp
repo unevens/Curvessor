@@ -54,11 +54,23 @@ GammaEnvEditor::resized()
     left += width;
   };
 
-  resize(channelLabels, 50);
+  resize(channelLabels, 40);
 
-  resize(metric, 100);
-  resize(attack, 120);
-  resize(release, 120);
-  resize(attackDelay, 100);
-  resize(releaseDelay, 100);
+  resize(metric, 90);
+  resize(attack, 135);
+  resize(release, 135);
+  resize(attackDelay, 135);
+  resize(releaseDelay, 135);
+}
+
+void
+GammaEnvEditor::setTableSettings(LinkableControlTable tableSettings)
+{
+  channelLabels.tableSettings = tableSettings;
+  tableSettings.drawLeftVericalLine = false;
+  metric.tableSettings = tableSettings;
+  attack.tableSettings = tableSettings;
+  release.tableSettings = tableSettings;
+  attackDelay.tableSettings = tableSettings;
+  releaseDelay.tableSettings = tableSettings;
 }

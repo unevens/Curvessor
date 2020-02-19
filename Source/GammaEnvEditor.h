@@ -32,10 +32,10 @@ struct GammaEnvParameters
   LinkableParameter<AudioParameterChoice> metric;
 };
 
-struct GammaEnvEditor : public Component
+class GammaEnvEditor : public Component
 {
 public:
-  static constexpr int WIDTH = 590;
+  static constexpr int WIDTH = 135 * 4 + 90 + 40;
 
   GammaEnvEditor(AudioProcessorValueTreeState& apvts,
                  GammaEnvParameters& parameters,
@@ -43,6 +43,9 @@ public:
 
   void resized() override;
 
+  void setTableSettings(LinkableControlTable tableSettings);
+
+private:
   ChannelLabels channelLabels;
 
   LinkableComboBox metric;
