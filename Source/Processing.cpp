@@ -316,7 +316,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
       parameters.envelopeFollower.releaseDelay.get(c)->get());
   }
 
-  double const automationAlpha = exp(-frequencyCoef * automationTime);
+  double const automationAlpha = exp(-frequencyCoef / automationTime);
 
   spline->SetSmoothingFrequency(automationAlpha);
 
