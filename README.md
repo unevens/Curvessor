@@ -30,7 +30,7 @@ You'll need [Projucer](https://shop.juce.com/get-juce) to open the file `Curvess
 
 Curvessor is developed and tested on Windows and Ubuntu. It should work also on macOS, but I can neither confirm nor deny...
 
-Binaries are available at https://www.unevens.net/curvessor.html.
+VST and VST3 binaries are available at https://www.unevens.net/curvessor.html.
 
 ## Submodules, libraries, credits
 
