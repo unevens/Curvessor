@@ -100,8 +100,7 @@ CurvessorAudioProcessor::Parameters::Parameters(
   envelopeFollower.metric =
     CreateLinkableChoiceParameters("Metric", { "Peak", "RMS" });
 
-  stereoLink =
-    CreateFloatParameter("Stereo-Link", 50.0, 0.0, 100.0);
+  stereoLink = CreateFloatParameter("Stereo-Link", 50.0, 0.0, 100.0);
 
   spline = std::unique_ptr<SplineParameters>(
     new SplineParameters("Spline",
@@ -164,6 +163,8 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
   levelVuMeterResults[1].store(-500.f);
   gainVuMeterResults[0].store(0.f);
   gainVuMeterResults[1].store(0.f);
+
+  LookAndFeel::setDefaultLookAndFeel(&looks);
 
   asyncOversampling.startTimer();
 }
@@ -381,3 +382,60 @@ createPluginFilter()
 {
   return new CurvessorAudioProcessor();
 }
+
+CurvessorLookAndFeel::CurvessorLookAndFeel()
+  : LookAndFeel_V4()
+{
+  setColour(Label::ColourIds::textColourId, Colours::black);
+  setColour(Slider::ColourIds::thumbColourId, Colours::goldenrod);
+  setColour(Slider::ColourIds::rotarySliderFillColourId, Colours::black);
+  setColour(Slider::ColourIds::rotarySliderOutlineColourId, Colours::darkgrey);
+  setColour(Slider::ColourIds::textBoxTextColourId, Colours::white);
+  setColour(Slider::ColourIds::textBoxBackgroundColourId, Colours::black);
+  setColour(Slider::ColourIds::textBoxHighlightColourId, Colours::darkgrey);
+  setColour(Slider::ColourIds::textBoxOutlineColourId, Colours::black);
+  setColour(ComboBox::ColourIds::arrowColourId, Colours::white);
+  setColour(ComboBox::ColourIds::backgroundColourId, Colours::black);
+  setColour(ComboBox::ColourIds::textColourId, Colours::white);
+  setColour(ComboBox::ColourIds::buttonColourId, Colours::white);
+  setColour(ComboBox::ColourIds::outlineColourId, Colours::grey);
+  setColour(ComboBox::ColourIds::focusedOutlineColourId, Colours::white);
+  setColour(ToggleButton::ColourIds::textColourId, Colours::black);
+  setColour(ToggleButton::ColourIds::tickColourId, Colours::black);
+  setColour(ToggleButton::ColourIds::tickDisabledColourId, Colours::black);
+}
+
+void
+CurvessorLookAndFeel::drawToggleButton(Graphics& g,
+                                       ToggleButton& button,
+                                       bool shouldDrawButtonAsHighlighted,
+                                       bool shouldDrawButtonAsDown)
+{
+  auto fontSize = curvessorFontSize;
+  auto tickWidth = fontSize * 1.1f;
+
+  drawTickBox(g,
+              button,
+              4.0f,
+              (button.getHeight() - tickWidth) * 0.5f,
+              tickWidth,
+              tickWidth,
+              button.getToggleState(),
+              button.isEnabled(),
+              shouldDrawButtonAsHighlighted,
+              shouldDrawButtonAsDown);
+
+  g.setColour(button.findColour(ToggleButton::textColourId));
+  g.setFont(Font(fontSize, curvessorFontStyle));
+
+  if (!button.isEnabled())
+    g.setOpacity(0.5f);
+
+  g.drawFittedText(button.getButtonText(),
+                   button.getLocalBounds()
+                     .withTrimmedLeft(roundToInt(tickWidth) + 10)
+                     .withTrimmedRight(2),
+                   Justification::centredLeft,
+                   10);
+}
+

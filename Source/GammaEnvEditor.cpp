@@ -41,6 +41,7 @@ GammaEnvEditor::GammaEnvEditor(AudioProcessorValueTreeState& apvts,
   attackDelay.tableSettings.drawLeftVericalLine = false;
   metric.tableSettings.drawLeftVericalLine = false;
   setSize(WIDTH, 120.f);
+  setOpaque(false);
 }
 
 void
@@ -54,7 +55,7 @@ GammaEnvEditor::resized()
     left += width;
   };
 
-  resize(channelLabels, 40);
+  resize(channelLabels, 50);
 
   resize(metric, 90);
   resize(attack, 140);

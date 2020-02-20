@@ -62,8 +62,10 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   , inputGainLabels(*p.GetCurvessorParameters().apvts, "Mid-Side")
 
   , outputGainLabels(*p.GetCurvessorParameters().apvts, "Mid-Side")
-{
 
+  , background(ImageCache::getFromMemory(BinaryData::background_png,
+                                         BinaryData::background_pngSize))
+{
   addAndMakeVisible(splineEditor);
   addAndMakeVisible(nodeEditor);
   addAndMakeVisible(inputGain);
@@ -114,7 +116,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   linearPhase.onClick = OnOversamplingChange;
   oversampling.onChange = OnOversamplingChange;
 
-  auto tableSettings = LinkableControlTable{};
+  auto tableSettings = LinkableControlTable();
   tableSettings.lineColour = lineColour;
   gammaEnvEditor.setTableSettings(tableSettings);
   nodeEditor.setTableSettings(tableSettings);
@@ -125,7 +127,8 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   outputGainLabels.tableSettings.lineColour = lineColour;
   inputGainLabels.tableSettings.lineColour = lineColour;
 
-  setSize(804, 890);
+  
+  setSize(814, 890);
 
   startTimer(250);
 }
@@ -136,9 +139,9 @@ CurvessorAudioProcessorEditor::~CurvessorAudioProcessorEditor() {}
 void
 CurvessorAudioProcessorEditor::paint(Graphics& g)
 {
-  g.fillAll(getLookAndFeel().findColour(ResizableWindow::backgroundColourId));
+  g.drawImage(background, getLocalBounds().toFloat());
 
-  g.setColour(Colours::black);
+  g.setColour(lineColour);
   g.drawRect(630, 10, 160, 330, 2);
   g.drawLine(631, 90, 790, 90, 2);
   g.drawLine(631, 155, 790, 155, 2);
@@ -172,17 +175,17 @@ CurvessorAudioProcessorEditor::resized()
   int const inputGainTop = 350;
 
   inputGainLabels.setTopLeftPosition(gainLeft, inputGainTop);
-  inputGainLabels.setSize(40, 160);
+  inputGainLabels.setSize(50, 160);
 
-  inputGain.setTopLeftPosition(gainLeft + 40, inputGainTop);
+  inputGain.setTopLeftPosition(gainLeft + 50, inputGainTop);
   inputGain.setSize(135, 160);
 
   int const outputGainTop = inputGainTop + 160 + offset;
 
   outputGainLabels.setTopLeftPosition(gainLeft, outputGainTop);
-  outputGainLabels.setSize(40, 160);
+  outputGainLabels.setSize(50, 160);
 
-  outputGain.setTopLeftPosition(gainLeft + 40, outputGainTop);
+  outputGain.setTopLeftPosition(gainLeft + 50, outputGainTop);
   outputGain.setSize(135, 160);
 
   Grid grid;

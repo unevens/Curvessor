@@ -25,6 +25,7 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 #include "SplineEditor.h"
 #include <JuceHeader.h>
 
+
 class CurvessorAudioProcessorEditor
   : public AudioProcessorEditor
   , public Timer
@@ -58,6 +59,8 @@ private:
   ChannelLabels outputGainLabels;
 
   static inline Colour lineColour = Colours::black;
+
+  Image background;
 
   void timerCallback() override;
 
