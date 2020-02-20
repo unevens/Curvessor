@@ -116,18 +116,26 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   linearPhase.onClick = OnOversamplingChange;
   oversampling.onChange = OnOversamplingChange;
 
+  lineColour = p.looks.frontColour.darker(1.f);
+
+  vuMeter.internalColour = backgroundColour;
+
   auto tableSettings = LinkableControlTable();
   tableSettings.lineColour = lineColour;
+  tableSettings.backgroundColour = backgroundColour;
   gammaEnvEditor.setTableSettings(tableSettings);
   nodeEditor.setTableSettings(tableSettings);
   inputGain.tableSettings.drawLeftVericalLine = false;
-  outputGain.tableSettings.drawLeftVericalLine = false;
   inputGain.tableSettings.lineColour = lineColour;
+  inputGain.tableSettings.backgroundColour = backgroundColour;
+  outputGain.tableSettings.drawLeftVericalLine = false;
   outputGain.tableSettings.lineColour = lineColour;
+  outputGain.tableSettings.backgroundColour = backgroundColour;
   outputGainLabels.tableSettings.lineColour = lineColour;
+  outputGainLabels.tableSettings.backgroundColour = backgroundColour;
   inputGainLabels.tableSettings.lineColour = lineColour;
+  inputGainLabels.tableSettings.backgroundColour = backgroundColour;
 
-  
   setSize(814, 890);
 
   startTimer(250);
@@ -141,11 +149,14 @@ CurvessorAudioProcessorEditor::paint(Graphics& g)
 {
   g.drawImage(background, getLocalBounds().toFloat());
 
+  g.setColour(backgroundColour);
+  g.fillRect(635, 10, 160, 330);
+
   g.setColour(lineColour);
-  g.drawRect(630, 10, 160, 330, 2);
-  g.drawLine(631, 90, 790, 90, 2);
-  g.drawLine(631, 155, 790, 155, 2);
-  g.drawLine(631, 230, 790, 230, 2);
+  g.drawRect(635, 10, 160, 330, 2);
+  g.drawLine(636, 90, 795, 90, 2);
+  g.drawLine(636, 155, 795, 155, 2);
+  g.drawLine(636, 230, 795, 230, 2);
 }
 
 void
@@ -227,7 +238,7 @@ CurvessorAudioProcessorEditor::resized()
   grid.alignContent = Grid::AlignContent::center;
 
   grid.performLayout(juce::Rectangle(
-    splineEditorSide + vuMeterWidth + 3 * offset + 15, offset + 5, 150, 310));
+    splineEditorSide + vuMeterWidth + 3 * offset + 20, offset + 5, 150, 310));
 
   stereoLink.getControl().setTopLeftPosition(
     stereoLink.getControl().getPosition().x + 10,

@@ -21,38 +21,12 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "GammaEnvEditor.h"
 #include "Linkables.h"
+#include "SimpleLookAndFeel.h"
 #include "SplineParameters.h"
 #include "avec/dsp/GammaEnv.hpp"
 #include "avec/dsp/Spline.hpp"
 #include "oversimple/AsyncOversampling.hpp"
 #include <JuceHeader.h>
-
-class CurvessorLookAndFeel : public LookAndFeel_V4
-{
-public:
-  CurvessorLookAndFeel();
-
-  static inline int curvessorFontSize = 16;
-  static inline int curvessorSliderLabelFontSize = 15;
-  static inline Font::FontStyleFlags curvessorFontStyle = Font::bold;
-
-  Font getTextButtonFont(TextButton&, int buttonHeight) override
-  {
-    return Font(curvessorFontSize, curvessorFontStyle);
-  }
-
-  Font getLabelFont(Label& label) override
-  {
-    return (dynamic_cast<Slider*>(label.getParentComponent()) == nullptr)
-             ? Font(curvessorFontSize, curvessorFontStyle)
-             : Font(curvessorSliderLabelFontSize);
-  }
-
-  void drawToggleButton(Graphics& g,
-                        ToggleButton& button,
-                        bool shouldDrawButtonAsHighlighted,
-                        bool shouldDrawButtonAsDown) override;
-};
 
 class CurvessorAudioProcessor : public AudioProcessor
 {
@@ -127,8 +101,6 @@ class CurvessorAudioProcessor : public AudioProcessor
                         avec::SplineInterface<Vec2d>* spline,
                         double const automationAlpha);
 
-  CurvessorLookAndFeel looks;
-
 public:
   static constexpr int maxNumNodes = 8;
 
@@ -142,6 +114,7 @@ public:
   oversimple::AsyncOversampling::Awaiter oversamplingAwaiter;
 
   // for gui
+  SimpleLookAndFeel looks;
   Parameters& GetCurvessorParameters() { return parameters; }
   std::array<std::atomic<float>, 2> levelVuMeterResults;
   std::array<std::atomic<float>, 2> gainVuMeterResults;

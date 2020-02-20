@@ -17,6 +17,10 @@
       <FILE id="QrMMZs" name="GainVuMeter.cpp" compile="1" resource="0" file="juicy/GainVuMeter.cpp"/>
       <FILE id="FftmJL" name="GainVuMeter.h" compile="0" resource="0" file="juicy/GainVuMeter.h"/>
       <FILE id="b7clfs" name="Linkables.h" compile="0" resource="0" file="juicy/Linkables.h"/>
+      <FILE id="mNscIY" name="SimpleLookAndFeel.cpp" compile="1" resource="0"
+            file="juicy/SimpleLookAndFeel.cpp"/>
+      <FILE id="QuZUgW" name="SimpleLookAndFeel.h" compile="0" resource="0"
+            file="juicy/SimpleLookAndFeel.h"/>
       <FILE id="RcFTsK" name="SplineEditor.cpp" compile="1" resource="0"
             file="juicy/SplineEditor.cpp"/>
       <FILE id="SJh6Mb" name="SplineEditor.h" compile="0" resource="0" file="juicy/SplineEditor.h"/>
