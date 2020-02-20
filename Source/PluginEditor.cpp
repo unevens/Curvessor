@@ -20,7 +20,6 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
 
-//==============================================================================
 CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   CurvessorAudioProcessor& p)
 
@@ -80,6 +79,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   addAndMakeVisible(inputGainLabels);
   addAndMakeVisible(outputGainLabels);
   addAndMakeVisible(midSideLabel);
+  addAndMakeVisible(url);
 
   AttachSplineEditorsAndInitialize(splineEditor, nodeEditor);
 
@@ -136,6 +136,21 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   inputGainLabels.tableSettings.lineColour = lineColour;
   inputGainLabels.tableSettings.backgroundColour = backgroundColour;
 
+  url.setFont({ 14, Font::bold });
+  url.setJustification(Justification::centred);
+  url.setReadOnly(true);
+  url.setColour(TextEditor::ColourIds::focusedOutlineColourId, Colours::white);
+  url.setColour(TextEditor::ColourIds::backgroundColourId,
+                Colours::transparentBlack);
+  url.setColour(TextEditor::ColourIds::outlineColourId,
+                Colours::transparentBlack);
+  url.setColour(TextEditor::ColourIds::textColourId,
+                Colours::white.withAlpha(0.2f));
+  url.setColour(TextEditor::ColourIds::highlightedTextColourId, Colours::white);
+  url.setColour(TextEditor::ColourIds::highlightColourId, Colours::black);
+  url.setText("www.unevens.net", dontSendNotification);
+  url.setJustification(Justification::left);
+
   setSize(814, 890);
 
   startTimer(250);
@@ -143,7 +158,6 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
 CurvessorAudioProcessorEditor::~CurvessorAudioProcessorEditor() {}
 
-//==============================================================================
 void
 CurvessorAudioProcessorEditor::paint(Graphics& g)
 {
@@ -243,6 +257,9 @@ CurvessorAudioProcessorEditor::resized()
   stereoLink.getControl().setTopLeftPosition(
     stereoLink.getControl().getPosition().x + 10,
     stereoLink.getControl().getPosition().y);
+
+  url.setTopLeftPosition(10, getHeight() - 18);
+  url.setSize(160, 16);
 
   splineEditor.areaInWhichToDrawNodes = juce::Rectangle(
     splineEditor.getPosition().x,

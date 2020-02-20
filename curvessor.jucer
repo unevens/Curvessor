@@ -8,7 +8,7 @@
               defines="R8B_PFFFT_DOUBLE=1">
   <MAINGROUP id="Ayh0pr" name="Curvessor">
     <GROUP id="{EB05EC87-04BF-C292-EA04-5ABBF5D410E0}" name="Images">
-      <FILE id="vFuPLc" name="background.png" compile="0" resource="1" file="Images/background.png"/>
+      <FILE id="sbku7d" name="background.png" compile="0" resource="1" file="Images/background.png"/>
     </GROUP>
     <GROUP id="{BA16BBD0-19DD-37ED-3CB0-7CD4547522B2}" name="juicy">
       <FILE id="PRrU2l" name="AttachedParameter.h" compile="0" resource="0"

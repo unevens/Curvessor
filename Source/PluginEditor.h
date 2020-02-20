@@ -56,6 +56,7 @@ private:
   LinkableControl<AttachedSlider> outputGain;
   ChannelLabels inputGainLabels;
   ChannelLabels outputGainLabels;
+  TextEditor url;
 
   Colour lineColour = Colours::white;
   Colour backgroundColour = Colours::black.withAlpha(0.6f);
