@@ -11,8 +11,8 @@
       <FILE id="sbku7d" name="background.png" compile="0" resource="1" file="Images/background.png"/>
     </GROUP>
     <GROUP id="{BA16BBD0-19DD-37ED-3CB0-7CD4547522B2}" name="juicy">
-      <FILE id="PRrU2l" name="AttachedParameter.h" compile="0" resource="0"
-            file="juicy/AttachedParameter.h"/>
+      <FILE id="a65Upm" name="AttachedControls.h" compile="0" resource="0"
+            file="juicy/AttachedControls.h"/>
       <FILE id="iXB9E7" name="Attachments.h" compile="0" resource="0" file="juicy/Attachments.h"/>
       <FILE id="QrMMZs" name="GainVuMeter.cpp" compile="1" resource="0" file="juicy/GainVuMeter.cpp"/>
       <FILE id="FftmJL" name="GainVuMeter.h" compile="0" resource="0" file="juicy/GainVuMeter.h"/>
