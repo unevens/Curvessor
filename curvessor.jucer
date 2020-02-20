@@ -16,6 +16,10 @@
       <FILE id="iXB9E7" name="Attachments.h" compile="0" resource="0" file="juicy/Attachments.h"/>
       <FILE id="QrMMZs" name="GainVuMeter.cpp" compile="1" resource="0" file="juicy/GainVuMeter.cpp"/>
       <FILE id="FftmJL" name="GainVuMeter.h" compile="0" resource="0" file="juicy/GainVuMeter.h"/>
+      <FILE id="aiAzdl" name="GammaEnvEditor.cpp" compile="1" resource="0"
+            file="juicy/GammaEnvEditor.cpp"/>
+      <FILE id="xxp9OM" name="GammaEnvEditor.h" compile="0" resource="0"
+            file="juicy/GammaEnvEditor.h"/>
       <FILE id="b7clfs" name="Linkables.h" compile="0" resource="0" file="juicy/Linkables.h"/>
       <FILE id="mNscIY" name="SimpleLookAndFeel.cpp" compile="1" resource="0"
             file="juicy/SimpleLookAndFeel.cpp"/>
@@ -273,10 +277,6 @@
             file="oversimple/oversimple/IirOversamplingFactory.hpp"/>
     </GROUP>
     <GROUP id="{A474DA88-0D09-9FDF-6DAE-6916A8BA27B4}" name="Source">
-      <FILE id="KkIlVN" name="GammaEnvEditor.cpp" compile="1" resource="0"
-            file="Source/GammaEnvEditor.cpp"/>
-      <FILE id="AZzOAz" name="GammaEnvEditor.h" compile="0" resource="0"
-            file="Source/GammaEnvEditor.h"/>
       <FILE id="er9RVx" name="Processing.cpp" compile="1" resource="0" file="Source/Processing.cpp"/>
       <FILE id="jNbU1R" name="PluginProcessor.cpp" compile="1" resource="0"
             file="Source/PluginProcessor.cpp"/>

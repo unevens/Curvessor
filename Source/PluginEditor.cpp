@@ -125,10 +125,8 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   tableSettings.backgroundColour = backgroundColour;
   gammaEnvEditor.setTableSettings(tableSettings);
   nodeEditor.setTableSettings(tableSettings);
-  inputGain.tableSettings.drawLeftVericalLine = false;
   inputGain.tableSettings.lineColour = lineColour;
   inputGain.tableSettings.backgroundColour = backgroundColour;
-  outputGain.tableSettings.drawLeftVericalLine = false;
   outputGain.tableSettings.lineColour = lineColour;
   outputGain.tableSettings.backgroundColour = backgroundColour;
   outputGainLabels.tableSettings.lineColour = lineColour;
@@ -164,13 +162,15 @@ CurvessorAudioProcessorEditor::paint(Graphics& g)
   g.drawImage(background, getLocalBounds().toFloat());
 
   g.setColour(backgroundColour);
-  g.fillRect(635, 10, 160, 330);
+  g.fillRect(632, 10, 160, 330);
 
   g.setColour(lineColour);
-  g.drawRect(635, 10, 160, 330, 2);
-  g.drawLine(636, 90, 795, 90, 2);
-  g.drawLine(636, 155, 795, 155, 2);
-  g.drawLine(636, 230, 795, 230, 2);
+  g.drawRect(632, 10, 160, 80, 1);
+  g.drawRect(632, 10, 160, 145, 1);
+  g.drawRect(632, 10, 160, 220, 1);
+  g.drawRect(632, 10, 160, 330, 1);
+
+  g.drawRect(splineEditor.getBounds().expanded(1, 1), 1);
 }
 
 void
@@ -179,11 +179,11 @@ CurvessorAudioProcessorEditor::resized()
   constexpr int offset = 10;
   constexpr int rowHeight = 40;
   constexpr int splineEditorSide = 500;
-  constexpr int vuMeterWidth = 90;
+  constexpr int vuMeterWidth = 89;
   constexpr int nodeEditorHeight = 160;
 
-  splineEditor.setTopLeftPosition(offset, offset);
-  splineEditor.setSize(splineEditorSide, splineEditorSide);
+  splineEditor.setTopLeftPosition(offset + 1, offset + 1);
+  splineEditor.setSize(splineEditorSide - 2, splineEditorSide - 2);
 
   vuMeter.setTopLeftPosition(splineEditorSide + 2 * offset, offset);
   vuMeter.setSize(vuMeterWidth, splineEditorSide);
@@ -202,16 +202,16 @@ CurvessorAudioProcessorEditor::resized()
   inputGainLabels.setTopLeftPosition(gainLeft, inputGainTop);
   inputGainLabels.setSize(50, 160);
 
-  inputGain.setTopLeftPosition(gainLeft + 50, inputGainTop);
-  inputGain.setSize(135, 160);
+  inputGain.setTopLeftPosition(gainLeft + 49, inputGainTop);
+  inputGain.setSize(136, 160);
 
   int const outputGainTop = inputGainTop + 160 + offset;
 
   outputGainLabels.setTopLeftPosition(gainLeft, outputGainTop);
   outputGainLabels.setSize(50, 160);
 
-  outputGain.setTopLeftPosition(gainLeft + 50, outputGainTop);
-  outputGain.setSize(135, 160);
+  outputGain.setTopLeftPosition(gainLeft + 49, outputGainTop);
+  outputGain.setSize(136, 160);
 
   Grid grid;
   using Track = Grid::TrackInfo;
@@ -252,7 +252,7 @@ CurvessorAudioProcessorEditor::resized()
   grid.alignContent = Grid::AlignContent::center;
 
   grid.performLayout(juce::Rectangle(
-    splineEditorSide + vuMeterWidth + 3 * offset + 20, offset + 5, 150, 310));
+    splineEditorSide + vuMeterWidth + 3 * offset + 17, offset + 5, 150, 310));
 
   stereoLink.getControl().setTopLeftPosition(
     stereoLink.getControl().getPosition().x + 10,
