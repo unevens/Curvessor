@@ -64,7 +64,6 @@
       </GROUP>
       <GROUP id="{6AD72D82-253F-6771-1CD7-80CD51492194}" name="avec">
         <GROUP id="{B2F4726F-AC34-1A27-6B46-1B0E6A7828F2}" name="dsp">
-          <FILE id="AYEMKw" name="Biquad.hpp" compile="0" resource="0" file="oversimple/avec/avec/dsp/Biquad.hpp"/>
           <FILE id="Ho0UFd" name="GammaEnv.hpp" compile="0" resource="0" file="oversimple/avec/avec/dsp/GammaEnv.hpp"/>
           <FILE id="QLH7go" name="GammaEnvMacro.hpp" compile="0" resource="0"
                 file="oversimple/avec/avec/dsp/GammaEnvMacro.hpp"/>
