@@ -75,12 +75,6 @@ class CurvessorAudioProcessor : public AudioProcessor
   VecBuffer<Vec2d> levelVuMeterBuffer{ 1 };
   VecBuffer<Vec2d> gainVuMeterBuffer{ 1 };
 
-  // state
-
-  bool lastIsMidSideEnabled = false;
-  bool lastIsUsingSideChain = false;
-  Topology lastTopology = Topology::Forward;
-
   double inputGain[2] = { 1.0, 1.0 };
   double sidechainInputGain[2] = { 1.0, 1.0 };
   double outputGain[2] = { 1.0, 1.0 };
