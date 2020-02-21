@@ -21,6 +21,8 @@
       <FILE id="xxp9OM" name="GammaEnvEditor.h" compile="0" resource="0"
             file="juicy/GammaEnvEditor.h"/>
       <FILE id="b7clfs" name="Linkables.h" compile="0" resource="0" file="juicy/Linkables.h"/>
+      <FILE id="m3t8s6" name="OversamplingParameters.h" compile="0" resource="0"
+            file="juicy/OversamplingParameters.h"/>
       <FILE id="mNscIY" name="SimpleLookAndFeel.cpp" compile="1" resource="0"
             file="juicy/SimpleLookAndFeel.cpp"/>
       <FILE id="QuZUgW" name="SimpleLookAndFeel.h" compile="0" resource="0"

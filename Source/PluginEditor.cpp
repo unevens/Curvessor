@@ -62,6 +62,15 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
   , outputGainLabels(*p.GetCurvessorParameters().apvts, "Mid-Side")
 
+  , oversampling(*this,
+                 *p.GetCurvessorParameters().apvts,
+                 "Oversampling",
+                 { "1x", "2x", "4x", "8x", "16x", "32x" })
+
+  , linearPhase(*this,
+                *p.GetCurvessorParameters().apvts,
+                "Linear-Phase-Oversampling")
+
   , background(ImageCache::getFromMemory(BinaryData::background_png,
                                          BinaryData::background_pngSize))
 {
@@ -74,8 +83,6 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   addAndMakeVisible(topologyLabel);
   addAndMakeVisible(stereoLinkLabel);
   addAndMakeVisible(oversamplingLabel);
-  addAndMakeVisible(oversampling);
-  addAndMakeVisible(linearPhase);
   addAndMakeVisible(inputGainLabels);
   addAndMakeVisible(outputGainLabels);
   addAndMakeVisible(midSideLabel);
@@ -97,24 +104,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
     splineEditor.vuMeter[c] = &processor.levelVuMeterResults[c];
   }
 
-  linearPhase.setButtonText("Linear Phase");
-
-  for (int i = 0; i <= 5; ++i) {
-    oversampling.addItem(std::to_string(1 << i) + "x", i + 1);
-  }
-
-  auto const OnOversamplingChange = [this] {
-    bool isLinearPhase = linearPhase.getToggleState();
-    int order = oversampling.getSelectedId() - 1;
-    processor.asyncOversampling.submitMessage(
-      [=](oversimple::OversamplingSettings& oversampling) {
-        oversampling.linearPhase = isLinearPhase;
-        oversampling.order = order;
-      });
-  };
-
-  linearPhase.onClick = OnOversamplingChange;
-  oversampling.onChange = OnOversamplingChange;
+  linearPhase.getControl().setButtonText("Linear Phase");
 
   lineColour = p.looks.frontColour.darker(1.f);
 
@@ -150,8 +140,6 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   url.setJustification(Justification::left);
 
   setSize(814, 890);
-
-  startTimer(250);
 }
 
 CurvessorAudioProcessorEditor::~CurvessorAudioProcessorEditor() {}
@@ -239,11 +227,11 @@ CurvessorAudioProcessorEditor::resized()
                    .withAlignSelf(GridItem::AlignSelf::center)
                    .withJustifySelf(GridItem::JustifySelf::center),
                  GridItem(oversamplingLabel),
-                 GridItem(oversampling)
+                 GridItem(oversampling.getControl())
                    .withWidth(70)
                    .withAlignSelf(GridItem::AlignSelf::center)
                    .withJustifySelf(GridItem::JustifySelf::center),
-                 GridItem(linearPhase)
+                 GridItem(linearPhase.getControl())
                    .withWidth(120)
                    .withAlignSelf(GridItem::AlignSelf::center)
                    .withJustifySelf(GridItem::JustifySelf::center) };
@@ -266,14 +254,4 @@ CurvessorAudioProcessorEditor::resized()
     splineEditor.getPosition().x,
     jmax(splineEditor.getWidth(), nodeEditor.getWidth()),
     nodeEditor.getPosition().y + nodeEditor.getHeight() + offset);
-}
-
-void
-CurvessorAudioProcessorEditor::timerCallback()
-{
-  processor.oversamplingGuiGetter.update();
-  auto& overSettings = processor.oversamplingGuiGetter.get();
-
-  linearPhase.setToggleState(overSettings.linearPhase, dontSendNotification);
-  oversampling.setSelectedId(overSettings.order + 1, dontSendNotification);
 }

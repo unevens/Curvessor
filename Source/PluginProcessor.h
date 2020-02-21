@@ -21,6 +21,7 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "GammaEnvEditor.h"
 #include "Linkables.h"
+#include "OversamplingParameters.h"
 #include "SimpleLookAndFeel.h"
 #include "SplineParameters.h"
 #include "avec/dsp/GammaEnv.hpp"
@@ -46,6 +47,8 @@ class CurvessorAudioProcessor : public AudioProcessor
     LinkableParameter<AudioParameterFloat> outputGain;
     GammaEnvParameters envelopeFollower;
     AudioParameterFloat* stereoLink;
+    OversamplingParameters oversampling;
+
     std::unique_ptr<SplineParameters> spline;
 
     std::unique_ptr<AudioProcessorValueTreeState> apvts;
@@ -54,6 +57,8 @@ class CurvessorAudioProcessor : public AudioProcessor
   };
 
   Parameters parameters;
+
+  std::unique_ptr<OversamplingAttachments> oversamplingAttachments;
 
   // splines
 
@@ -82,6 +87,15 @@ class CurvessorAudioProcessor : public AudioProcessor
   // buffer for single precision processing call
   AudioBuffer<double> floatToDouble;
 
+  // oversampling
+  using Oversampling = oversimple::Oversampling<double>;
+  using OversamplingSettings = oversimple::OversamplingSettings;
+  oversimple::AsyncOversampling asyncOversampling;
+  oversimple::OversamplingGetter<double>& oversamplingGetter;
+  oversimple::AsyncOversampling::Awaiter oversamplingAwaiter;
+
+  // processing
+
   void forwardProcess(VecBuffer<Vec2d>& io,
                       avec::SplineInterface<Vec2d>* spline,
                       double const automationAlpha);
@@ -98,20 +112,16 @@ class CurvessorAudioProcessor : public AudioProcessor
 public:
   static constexpr int maxNumNodes = 8;
 
-  // oversampling
-  using Oversampling = oversimple::Oversampling<double>;
-  using OversamplingSettings = oversimple::OversamplingSettings;
-  oversimple::AsyncOversampling asyncOversampling;
-  oversimple::OversamplingGetter<double>& oversamplingGetter;
-  oversimple::OversamplingSettingsGetter& oversamplingGuiGetter;
-  oversimple::OversamplingSettingsGetter& oversamplingSerializationGetter;
-  oversimple::AsyncOversampling::Awaiter oversamplingAwaiter;
-
   // for gui
+
   SimpleLookAndFeel looks;
+
   Parameters& GetCurvessorParameters() { return parameters; }
+
   std::array<std::atomic<float>, 2> levelVuMeterResults;
   std::array<std::atomic<float>, 2> gainVuMeterResults;
+
+  // AudioProcessor interface
 
   //==============================================================================
   CurvessorAudioProcessor();

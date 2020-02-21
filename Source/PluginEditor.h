@@ -25,9 +25,7 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 #include "SplineEditor.h"
 #include <JuceHeader.h>
 
-class CurvessorAudioProcessorEditor
-  : public AudioProcessorEditor
-  , public Timer
+class CurvessorAudioProcessorEditor : public AudioProcessorEditor
 {
 public:
   CurvessorAudioProcessorEditor(CurvessorAudioProcessor&);
@@ -47,8 +45,8 @@ private:
   Label midSideLabel{ {}, "Mid-Side" };
   AttachedComboBox topologyEditor;
   Label topologyLabel{ {}, "Topology" };
-  ToggleButton linearPhase;
-  ComboBox oversampling;
+  AttachedComboBox oversampling;
+  AttachedToggle linearPhase;
   Label oversamplingLabel{ {}, "Oversampling" };
   AttachedSlider stereoLink;
   Label stereoLinkLabel{ {}, "Stereo Link" };
@@ -62,8 +60,6 @@ private:
   Colour backgroundColour = Colours::black.withAlpha(0.6f);
 
   Image background;
-
-  void timerCallback() override;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CurvessorAudioProcessorEditor)
 };
