@@ -68,7 +68,6 @@
           <FILE id="Ho0UFd" name="GammaEnv.hpp" compile="0" resource="0" file="oversimple/avec/avec/dsp/GammaEnv.hpp"/>
           <FILE id="QLH7go" name="GammaEnvMacro.hpp" compile="0" resource="0"
                 file="oversimple/avec/avec/dsp/GammaEnvMacro.hpp"/>
-          <FILE id="E1Plcr" name="Noise.hpp" compile="0" resource="0" file="oversimple/avec/avec/dsp/Noise.hpp"/>
           <FILE id="qOrkH0" name="Spline.hpp" compile="0" resource="0" file="oversimple/avec/avec/dsp/Spline.hpp"/>
           <FILE id="ysveHo" name="SplineMacro.hpp" compile="0" resource="0" file="oversimple/avec/avec/dsp/SplineMacro.hpp"/>
         </GROUP>
@@ -111,10 +110,6 @@
         <FILE id="VRPsAC" name="Simd.hpp" compile="0" resource="0" file="oversimple/avec/avec/Simd.hpp"/>
         <FILE id="h4TwJh" name="VecBuffer.hpp" compile="0" resource="0" file="oversimple/avec/avec/VecBuffer.hpp"/>
         <FILE id="GuzbDV" name="VecView.hpp" compile="0" resource="0" file="oversimple/avec/avec/VecView.hpp"/>
-        <FILE id="A87GVU" name="xorshift32_16bit_simd.c" compile="1" resource="0"
-              file="oversimple/avec/avec/xorshift32_16bit_simd.c"/>
-        <FILE id="XiKbzm" name="xorshift32_16bit_simd.h" compile="0" resource="0"
-              file="oversimple/avec/avec/xorshift32_16bit_simd.h"/>
       </GROUP>
       <GROUP id="{E2F8119C-5FB4-6460-FB26-B4E6F59BB5BC}" name="hiir">
         <FILE id="LCJQis" name="def.h" compile="0" resource="0" file="oversimple/hiir/def.h"/>
@@ -310,6 +305,28 @@
         <MODULEPATH id="juce_opengl" path="../../JUCE/modules"/>
       </MODULEPATHS>
     </VS2019>
+    <LINUX_MAKE targetFolder="Builds/LinuxMakefile" extraCompilerFlags="-march=native&#10;-fPIC">
+      <CONFIGURATIONS>
+        <CONFIGURATION isDebug="1" name="Debug"/>
+        <CONFIGURATION isDebug="0" name="Release"/>
+      </CONFIGURATIONS>
+      <MODULEPATHS>
+        <MODULEPATH id="juce_opengl" path="../../juce"/>
+        <MODULEPATH id="juce_gui_extra" path="../../juce"/>
+        <MODULEPATH id="juce_gui_basics" path="../../juce"/>
+        <MODULEPATH id="juce_graphics" path="../../juce"/>
+        <MODULEPATH id="juce_events" path="../../juce"/>
+        <MODULEPATH id="juce_data_structures" path="../../juce"/>
+        <MODULEPATH id="juce_cryptography" path="../../juce"/>
+        <MODULEPATH id="juce_core" path="../../juce"/>
+        <MODULEPATH id="juce_audio_utils" path="../../juce"/>
+        <MODULEPATH id="juce_audio_processors" path="../../juce"/>
+        <MODULEPATH id="juce_audio_plugin_client" path="../../juce"/>
+        <MODULEPATH id="juce_audio_formats" path="../../juce"/>
+        <MODULEPATH id="juce_audio_devices" path="../../juce"/>
+        <MODULEPATH id="juce_audio_basics" path="../../juce"/>
+      </MODULEPATHS>
+    </LINUX_MAKE>
   </EXPORTFORMATS>
   <MODULES>
     <MODULE id="juce_audio_basics" showAllCode="1" useLocalCopy="0" useGlobalPath="1"/>
@@ -330,6 +347,8 @@
   </MODULES>
   <LIVE_SETTINGS>
     <WINDOWS/>
+    <LINUX/>
   </LIVE_SETTINGS>
-  <JUCEOPTIONS JUCE_VST3_CAN_REPLACE_VST2="0" JUCE_STRICT_REFCOUNTEDPOINTER="1"/>
+  <JUCEOPTIONS JUCE_VST3_CAN_REPLACE_VST2="0" JUCE_STRICT_REFCOUNTEDPOINTER="1"
+               JUCE_WEB_BROWSER="0"/>
 </JUCERPROJECT>
