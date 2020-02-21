@@ -2,7 +2,7 @@
 
 ![Curvessor GUI](screenshot.jpg?raw=true 'Curvessor')
 
-[Curvessor](https://www.unevens.net/curvessor.html) is an audio plug-in that implements a dynamic range processor in which **the response curves of each channel are automatable splines**.
+[Curvessor](https://www.unevens.net/curvessor.html) is an audio plug-in that implements a dynamic range processor in which **the response curve of each channel is an automatable spline**.
 
 Curvessor can be used as a classic compressor/expander, enjoying the freedom and precision that comes with spline editing.
 
