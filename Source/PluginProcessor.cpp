@@ -83,7 +83,7 @@ CurvessorAudioProcessor::Parameters::Parameters(
 
   oversampling = { static_cast<RangedAudioParameter*>(CreateChoiceParameter(
                      "Oversampling", { "1x", "2x", "4x", "8x", "16x", "32x" })),
-                   createWrappedBoolParameter("Linear Phase Oversampling",
+                   createWrappedBoolParameter("Linear-Phase-Oversampling",
                                               false) };
 
   inputGain = CreateLinkableFloatParameters("Input-Gain", 0.f, -48.f, +48.f);
