@@ -116,7 +116,7 @@ public:
 
   SimpleLookAndFeel looks;
 
-  Parameters& GetCurvessorParameters() { return parameters; }
+  Parameters& getCurvessorParameters() { return parameters; }
 
   std::array<std::atomic<float>, 2> levelVuMeterResults;
   std::array<std::atomic<float>, 2> gainVuMeterResults;

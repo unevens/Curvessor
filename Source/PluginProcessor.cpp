@@ -135,9 +135,9 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 #endif
   , parameters(*this)
 
-  , envelopeFollower(Aligned<avec::GammaEnv<Vec2d>>::New())
+  , envelopeFollower(Aligned<avec::GammaEnv<Vec2d>>::make())
 
-  , splines(avec::SplineHolder<avec::Spline, Vec2d>::New<maxNumNodes>())
+  , splines(avec::SplineHolder<avec::Spline, Vec2d>::make<maxNumNodes>())
 
   , envelopeFollowerSettings(*envelopeFollower)
 
@@ -146,14 +146,14 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
     oversampling.numScalarToVecUpsamplers = 2;
     oversampling.numVecToScalarDownsamplers = 1;
     oversampling.numChannels = 2;
-    oversampling.UpdateLatency = [this](int latency) {
+    oversampling.updateLatency = [this](int latency) {
       setLatencySamples(latency);
     };
     return oversampling;
   }())
 
   , oversamplingGetter(
-      *oversimple::RequestOversamplingGetter<double>(asyncOversampling))
+      *oversimple::requestOversamplingGetter<double>(asyncOversampling))
 
   , oversamplingAwaiter(asyncOversampling.requestAwaiter())
 
@@ -188,8 +188,8 @@ CurvessorAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 void
 CurvessorAudioProcessor::reset()
 {
-  envelopeFollower->Reset();
-  splines.Reset();
+  envelopeFollower->reset();
+  splines.reset();
   levelVuMeterBuffer[0] = -200.0;
   gainVuMeterBuffer[0] = 0.f;
   stereoLink[0] = stereoLinkTarget[0];

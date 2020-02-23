@@ -22,7 +22,7 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 #include "avec/dsp/SplineMacro.hpp"
 
 static void
-LeftRightToMidSide(double** io, int const n)
+leftRightToMidSide(double** io, int const n)
 {
   for (int i = 0; i < n; ++i) {
     double m = 0.5 * (io[0][i] + io[1][i]);
@@ -33,7 +33,7 @@ LeftRightToMidSide(double** io, int const n)
 }
 
 static void
-MidSideToLeftRight(double** io, int const n)
+midSideToLeftRight(double** io, int const n)
 {
   for (int i = 0; i < n; ++i) {
     double l = io[0][i] + io[1][i];
@@ -44,7 +44,7 @@ MidSideToLeftRight(double** io, int const n)
 }
 
 static void
-ApplyGain(double** io,
+applyGain(double** io,
           double* gain_target,
           double* gain_state,
           double const alpha,
@@ -83,7 +83,7 @@ CurvessorAudioProcessor::forwardProcess(VecBuffer<Vec2d>& io,
                                         avec::SplineInterface<Vec2d>* spline,
                                         double const automationAlpha)
 {
-  int const numNodes = spline->GetNumNodes();
+  int const numNodes = spline->getNumNodes();
 
   LOAD_SPLINE_STATE(spline, numNodes, Vec2d, maxNumNodes);
   LOAD_GAMMAENV_STATE(envelopeFollower, Vec2d);
@@ -94,7 +94,7 @@ CurvessorAudioProcessor::forwardProcess(VecBuffer<Vec2d>& io,
   __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer[0]);
   __m128d automation_alpha = _mm_set1_pd(automationAlpha);
 
-  for (int i = 0; i < io.GetNumSamples(); ++i) {
+  for (int i = 0; i < io.getNumSamples(); ++i) {
 
     Vec2d in = io[i];
 
@@ -134,7 +134,7 @@ CurvessorAudioProcessor::feedbackProcess(VecBuffer<Vec2d>& io,
                                          avec::SplineInterface<Vec2d>* spline,
                                          double const automationAlpha)
 {
-  int const numNodes = spline->GetNumNodes();
+  int const numNodes = spline->getNumNodes();
 
   LOAD_SPLINE_STATE(spline, numNodes, Vec2d, maxNumNodes);
   LOAD_GAMMAENV_STATE(envelopeFollower, Vec2d);
@@ -147,7 +147,7 @@ CurvessorAudioProcessor::feedbackProcess(VecBuffer<Vec2d>& io,
 
   Vec2d env_in = feedbackBuffer[0];
 
-  for (int i = 0; i < io.GetNumSamples(); ++i) {
+  for (int i = 0; i < io.getNumSamples(); ++i) {
 
     Vec2d in = io[i];
 
@@ -190,7 +190,7 @@ CurvessorAudioProcessor::sidechainProcess(VecBuffer<Vec2d>& io,
                                           avec::SplineInterface<Vec2d>* spline,
                                           double const automationAlpha)
 {
-  int const numNodes = spline->GetNumNodes();
+  int const numNodes = spline->getNumNodes();
 
   LOAD_SPLINE_STATE(spline, numNodes, Vec2d, maxNumNodes);
   LOAD_GAMMAENV_STATE(envelopeFollower, Vec2d);
@@ -201,7 +201,7 @@ CurvessorAudioProcessor::sidechainProcess(VecBuffer<Vec2d>& io,
   __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer[0]);
   __m128d automation_alpha = _mm_set1_pd(automationAlpha);
 
-  for (int i = 0; i < io.GetNumSamples(); ++i) {
+  for (int i = 0; i < io.getNumSamples(); ++i) {
 
     Vec2d in = io[i];
 
@@ -273,11 +273,11 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
   auto spline = parameters.spline->updateSpline(splines);
 
   if (parameters.spline->needsReset()) {
-    spline->Reset();
+    spline->reset();
   }
 
   double const frequencyCoef = 1000.0 * MathConstants<double>::twoPi /
-                               (getSampleRate() * oversampling.GetRate());
+                               (getSampleRate() * oversampling.getRate());
 
   double inputGainTarget[2];
   double outputGainTarget[2];
@@ -287,7 +287,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
     outputGainTarget[c] = exp(db_to_lin * parameters.outputGain.get(c)->get());
     inputGainTarget[c] = exp(db_to_lin * parameters.inputGain.get(c)->get());
 
-    envelopeFollowerSettings.Setup(
+    envelopeFollowerSettings.setup(
       c,
       parameters.envelopeFollower.metric.get(c)->getIndex() == 1,
       frequencyCoef / parameters.envelopeFollower.attack.get(c)->get(),
@@ -298,30 +298,30 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   double const automationAlpha = exp(-frequencyCoef / automationTime);
 
-  spline->SetSmoothingFrequency(automationAlpha);
+  spline->setSmoothingFrequency(automationAlpha);
 
   // mid side
 
   if (isMidSideEnabled) {
-    LeftRightToMidSide(ioAudio, numSamples);
+    leftRightToMidSide(ioAudio, numSamples);
   }
 
   // input gain
 
-  ApplyGain(ioAudio, inputGainTarget, inputGain, automationAlpha, numSamples);
+  applyGain(ioAudio, inputGainTarget, inputGain, automationAlpha, numSamples);
 
   // early return if no nodes are active
 
   if (!spline) {
     // output gain
 
-    ApplyGain(
+    applyGain(
       ioAudio, outputGainTarget, outputGain, automationAlpha, numSamples);
 
     // mid side
 
     if (isMidSideEnabled) {
-      MidSideToLeftRight(ioAudio, numSamples);
+      midSideToLeftRight(ioAudio, numSamples);
     }
 
     return;
@@ -329,10 +329,10 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   // oversampling
 
-  oversampling.PrepareBuffers(numSamples); // extra safety measure
+  oversampling.prepareBuffers(numSamples); // extra safety measure
 
   int const numUpsampledSamples =
-    oversampling.scalarToVecUpsamplers[0]->ProcessBlock(ioAudio, 2, numSamples);
+    oversampling.scalarToVecUpsamplers[0]->processBlock(ioAudio, 2, numSamples);
 
   if (numUpsampledSamples == 0) {
     for (auto i = 0; i < totalNumOutputChannels; ++i) {
@@ -341,8 +341,8 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
     return;
   }
 
-  auto& upsampledBuffer = oversampling.scalarToVecUpsamplers[0]->GetOutput();
-  auto& upsampled_io = upsampledBuffer.GetBuffer2(0);
+  auto& upsampledBuffer = oversampling.scalarToVecUpsamplers[0]->getOutput();
+  auto& upsampled_io = upsampledBuffer.getBuffer2(0);
 
   // sidechain
 
@@ -351,21 +351,21 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
                                  buffer.getWritePointer(3) };
 
     if (isMidSideEnabled) {
-      LeftRightToMidSide(envelopeInput, numSamples);
+      leftRightToMidSide(envelopeInput, numSamples);
     }
 
-    ApplyGain(ioAudio,
+    applyGain(ioAudio,
               inputGainTarget,
               sidechainInputGain,
               automationAlpha,
               numSamples);
 
-    oversampling.scalarToVecUpsamplers[1]->ProcessBlock(
+    oversampling.scalarToVecUpsamplers[1]->processBlock(
       envelopeInput, 2, numSamples);
   }
 
   auto& upsampled_env_input =
-    oversampling.scalarToVecUpsamplers[1]->GetOutput().GetBuffer2(0);
+    oversampling.scalarToVecUpsamplers[1]->getOutput().getBuffer2(0);
 
   // processing
 
@@ -400,17 +400,17 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   // downsample
 
-  oversampling.vecToScalarDownsamplers[0]->ProcessBlock(
+  oversampling.vecToScalarDownsamplers[0]->processBlock(
     upsampledBuffer, ioAudio, 2, numSamples);
 
   // output gain
 
-  ApplyGain(ioAudio, outputGainTarget, outputGain, automationAlpha, numSamples);
+  applyGain(ioAudio, outputGainTarget, outputGain, automationAlpha, numSamples);
 
   // mid side
 
   if (isMidSideEnabled) {
-    MidSideToLeftRight(ioAudio, numSamples);
+    midSideToLeftRight(ioAudio, numSamples);
   }
 
   // update vu meters

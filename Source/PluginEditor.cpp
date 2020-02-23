@@ -27,19 +27,19 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
   , processor(p)
 
-  , splineEditor(*p.GetCurvessorParameters().spline,
-                 *p.GetCurvessorParameters().apvts)
+  , splineEditor(*p.getCurvessorParameters().spline,
+                 *p.getCurvessorParameters().apvts)
 
-  , nodeEditor(*p.GetCurvessorParameters().spline,
-               *p.GetCurvessorParameters().apvts)
+  , nodeEditor(*p.getCurvessorParameters().spline,
+               *p.getCurvessorParameters().apvts)
 
-  , gammaEnvEditor(*p.GetCurvessorParameters().apvts,
-                   p.GetCurvessorParameters().envelopeFollower)
+  , gammaEnvEditor(*p.getCurvessorParameters().apvts,
+                   p.getCurvessorParameters().envelopeFollower)
 
-  , midSideEditor(*this, *p.GetCurvessorParameters().apvts, "Mid-Side")
+  , midSideEditor(*this, *p.getCurvessorParameters().apvts, "Mid-Side")
 
   , topologyEditor(*this,
-                   *p.GetCurvessorParameters().apvts,
+                   *p.getCurvessorParameters().apvts,
                    "Topology",
                    { "Forward", "Feedback", "SideChain" })
 
@@ -48,27 +48,27 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
             36.f,
             [](float x) { return std::pow(x, 1.f / 2.f); })
 
-  , inputGain(*p.GetCurvessorParameters().apvts,
+  , inputGain(*p.getCurvessorParameters().apvts,
               "Input Gain",
-              p.GetCurvessorParameters().inputGain)
+              p.getCurvessorParameters().inputGain)
 
-  , outputGain(*p.GetCurvessorParameters().apvts,
+  , outputGain(*p.getCurvessorParameters().apvts,
                "Output Gain",
-               p.GetCurvessorParameters().outputGain)
+               p.getCurvessorParameters().outputGain)
 
-  , stereoLink(*this, *p.GetCurvessorParameters().apvts, "Stereo-Link")
+  , stereoLink(*this, *p.getCurvessorParameters().apvts, "Stereo-Link")
 
-  , inputGainLabels(*p.GetCurvessorParameters().apvts, "Mid-Side")
+  , inputGainLabels(*p.getCurvessorParameters().apvts, "Mid-Side")
 
-  , outputGainLabels(*p.GetCurvessorParameters().apvts, "Mid-Side")
+  , outputGainLabels(*p.getCurvessorParameters().apvts, "Mid-Side")
 
   , oversampling(*this,
-                 *p.GetCurvessorParameters().apvts,
+                 *p.getCurvessorParameters().apvts,
                  "Oversampling",
                  { "1x", "2x", "4x", "8x", "16x", "32x" })
 
   , linearPhase(*this,
-                *p.GetCurvessorParameters().apvts,
+                *p.getCurvessorParameters().apvts,
                 "Linear-Phase-Oversampling")
 
   , background(ImageCache::getFromMemory(BinaryData::background_png,
