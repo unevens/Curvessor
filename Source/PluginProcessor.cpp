@@ -123,16 +123,13 @@ CurvessorAudioProcessor::Parameters::Parameters(
 }
 
 CurvessorAudioProcessor::CurvessorAudioProcessor()
+
 #ifndef JucePlugin_PreferredChannelConfigurations
   : AudioProcessor(BusesProperties()
-#if !JucePlugin_IsMidiEffect
-#if !JucePlugin_IsSynth
                      .withInput("Input", AudioChannelSet::stereo(), true)
+                     .withOutput("Output", AudioChannelSet::stereo(), true))
 #endif
-                     .withOutput("Output", AudioChannelSet::stereo(), true)
-#endif
-                     )
-#endif
+
   , parameters(*this)
 
   , envelopeFollower(Aligned<avec::GammaEnv<Vec2d>>::make())
