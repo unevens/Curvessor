@@ -178,13 +178,15 @@ CurvessorAudioProcessorEditor::resized()
   nodeEditor.setTopLeftPosition(offset, splineEditorSide + 2 * offset);
   nodeEditor.setSize(splineEditorSide + offset + vuMeterWidth + 2, 160._p);
 
-  auto const gammaEnvEditorY = splineEditorSide + nodeEditorHeight + 3 * offset;
+  constexpr auto gammaEnvEditorY =
+    splineEditorSide + nodeEditorHeight + 3 * offset;
+
   gammaEnvEditor.setTopLeftPosition(offset, gammaEnvEditorY);
   gammaEnvEditor.setSize(gammaEnvEditor.fullSizeWidth * uiGlobalScaleFactor,
                          rowHeight * 4);
 
-  auto const gainLeft = 3 * offset + splineEditorSide + vuMeterWidth;
-  auto const inputGainTop = 350._p;
+  constexpr auto gainLeft = 3 * offset + splineEditorSide + vuMeterWidth;
+  constexpr auto inputGainTop = 350._p;
 
   inputGainLabels.setTopLeftPosition(gainLeft, inputGainTop);
   inputGainLabels.setSize(50._p, 160._p);
@@ -192,7 +194,7 @@ CurvessorAudioProcessorEditor::resized()
   inputGain.setTopLeftPosition(gainLeft + 50._p - 1, inputGainTop);
   inputGain.setSize(136._p, 160._p);
 
-  auto const outputGainTop = inputGainTop + 160._p + offset;
+  constexpr auto outputGainTop = inputGainTop + 160._p + offset;
 
   outputGainLabels.setTopLeftPosition(gainLeft, outputGainTop);
   outputGainLabels.setSize(50._p, 160._p);
