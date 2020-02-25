@@ -29,6 +29,17 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 #include "oversimple/AsyncOversampling.hpp"
 #include <JuceHeader.h>
 
+#ifndef CURVESSOR_UI_SCALE
+#define CURVESSOR_UI_SCALE 0.8f
+#endif
+
+static constexpr float uiGlobalScaleFactor = CURVESSOR_UI_SCALE;
+
+constexpr static long double operator"" _p(long double px)
+{
+  return px * uiGlobalScaleFactor;
+}
+
 class CurvessorAudioProcessor : public AudioProcessor
 {
   enum class Topology

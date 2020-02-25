@@ -90,10 +90,10 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
   AttachSplineEditorsAndInitialize(splineEditor, nodeEditor);
 
-  topologyLabel.setFont(Font(20, Font::bold));
-  oversamplingLabel.setFont(Font(20, Font::bold));
-  stereoLinkLabel.setFont(Font(20, Font::bold));
-  midSideLabel.setFont(Font(20, Font::bold));
+  topologyLabel.setFont(Font(20._p, Font::bold));
+  oversamplingLabel.setFont(Font(20._p, Font::bold));
+  stereoLinkLabel.setFont(Font(20._p, Font::bold));
+  midSideLabel.setFont(Font(20._p, Font::bold));
 
   topologyLabel.setJustificationType(Justification::centred);
   oversamplingLabel.setJustificationType(Justification::centred);
@@ -124,7 +124,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   inputGainLabels.tableSettings.lineColour = lineColour;
   inputGainLabels.tableSettings.backgroundColour = backgroundColour;
 
-  url.setFont({ 14, Font::bold });
+  url.setFont({ 14._p, Font::bold });
   url.setJustification(Justification::centred);
   url.setReadOnly(true);
   url.setColour(TextEditor::ColourIds::focusedOutlineColourId, Colours::white);
@@ -139,7 +139,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   url.setText("www.unevens.net", dontSendNotification);
   url.setJustification(Justification::left);
 
-  setSize(814, 890);
+  setSize(814._p, 890._p);
 }
 
 CurvessorAudioProcessorEditor::~CurvessorAudioProcessorEditor() {}
@@ -150,25 +150,24 @@ CurvessorAudioProcessorEditor::paint(Graphics& g)
   g.drawImage(background, getLocalBounds().toFloat());
 
   g.setColour(backgroundColour);
-  g.fillRect(632, 10, 160, 330);
+  g.fillRect(juce::Rectangle<float>(632._p, 10._p, 160._p, 330._p));
 
   g.setColour(lineColour);
-  g.drawRect(632, 10, 160, 80, 1);
-  g.drawRect(632, 10, 160, 145, 1);
-  g.drawRect(632, 10, 160, 220, 1);
-  g.drawRect(632, 10, 160, 330, 1);
+  g.drawRect(632._p, 10._p, 160._p, 80._p, 1);
+  g.drawRect(632._p, 10._p, 160._p, 145._p, 1);
+  g.drawRect(632._p, 10._p, 160._p, 220._p, 1);
+  g.drawRect(632._p, 10._p, 160._p, 330._p, 1);
 
   g.drawRect(splineEditor.getBounds().expanded(1, 1), 1);
 }
-
 void
 CurvessorAudioProcessorEditor::resized()
 {
-  constexpr int offset = 10;
-  constexpr int rowHeight = 40;
-  constexpr int splineEditorSide = 500;
-  constexpr int vuMeterWidth = 89;
-  constexpr int nodeEditorHeight = 160;
+  constexpr auto offset = 10._p;
+  constexpr auto rowHeight = 40._p;
+  constexpr auto splineEditorSide = 500._p;
+  constexpr auto vuMeterWidth = 89._p;
+  constexpr auto nodeEditorHeight = 160._p;
 
   splineEditor.setTopLeftPosition(offset + 1, offset + 1);
   splineEditor.setSize(splineEditorSide - 2, splineEditorSide - 2);
@@ -177,79 +176,89 @@ CurvessorAudioProcessorEditor::resized()
   vuMeter.setSize(vuMeterWidth, splineEditorSide);
 
   nodeEditor.setTopLeftPosition(offset, splineEditorSide + 2 * offset);
-  nodeEditor.setSize(splineEditorSide + offset + vuMeterWidth, 160);
+  nodeEditor.setSize(splineEditorSide + offset + vuMeterWidth + 2, 160._p);
 
-  int const gammaEnvEditorY = splineEditorSide + nodeEditorHeight + 3 * offset;
-  gammaEnvEditor.setTopLeftPosition(
-    offset, splineEditorSide + nodeEditorHeight + 3 * offset);
-  gammaEnvEditor.setSize(GammaEnvEditor::WIDTH, rowHeight * 4);
+  auto const gammaEnvEditorY = splineEditorSide + nodeEditorHeight + 3 * offset;
+  gammaEnvEditor.setTopLeftPosition(offset, gammaEnvEditorY);
+  gammaEnvEditor.setSize(gammaEnvEditor.fullSizeWidth * uiGlobalScaleFactor,
+                         rowHeight * 4);
 
-  int const gainLeft = 3 * offset + splineEditorSide + vuMeterWidth;
-  int const inputGainTop = 350;
+  auto const gainLeft = 3 * offset + splineEditorSide + vuMeterWidth;
+  auto const inputGainTop = 350._p;
 
   inputGainLabels.setTopLeftPosition(gainLeft, inputGainTop);
-  inputGainLabels.setSize(50, 160);
+  inputGainLabels.setSize(50._p, 160._p);
 
-  inputGain.setTopLeftPosition(gainLeft + 49, inputGainTop);
-  inputGain.setSize(136, 160);
+  inputGain.setTopLeftPosition(gainLeft + 50._p - 1, inputGainTop);
+  inputGain.setSize(136._p, 160._p);
 
-  int const outputGainTop = inputGainTop + 160 + offset;
+  auto const outputGainTop = inputGainTop + 160._p + offset;
 
   outputGainLabels.setTopLeftPosition(gainLeft, outputGainTop);
-  outputGainLabels.setSize(50, 160);
+  outputGainLabels.setSize(50._p, 160._p);
 
-  outputGain.setTopLeftPosition(gainLeft + 49, outputGainTop);
-  outputGain.setSize(136, 160);
+  outputGain.setTopLeftPosition(gainLeft + 50._p - 1, outputGainTop);
+  outputGain.setSize(136._p, 160._p);
 
   Grid grid;
   using Track = Grid::TrackInfo;
 
-  grid.templateRows = { Track(40_px), Track(40_px), Track(40_px),
-                        Track(30_px), Track(30_px), Track(40_px),
-                        Track(40_px), Track(40_px), Track(30_px) };
+  grid.templateRows = { Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
+                        Track(Grid::Px(40._p)), Track(Grid::Px(30._p)),
+                        Track(Grid::Px(30._p)), Track(Grid::Px(40._p)),
+                        Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
+                        Track(Grid::Px(30._p)) };
 
   grid.templateColumns = { Track(1_fr) };
 
   grid.items = { GridItem(topologyLabel),
                  GridItem(topologyEditor.getControl())
-                   .withWidth(100)
-                   .withHeight(30)
-                   .withAlignSelf(GridItem::AlignSelf::center)
+                   .withWidth(120._p)
+                   .withHeight(30._p)
+                   .withAlignSelf(GridItem::AlignSelf::start)
                    .withJustifySelf(GridItem::JustifySelf::center),
                  GridItem(midSideLabel),
                  GridItem(midSideEditor.getControl())
-                   .withWidth(30)
+                   .withWidth(30._p)
                    .withAlignSelf(GridItem::AlignSelf::center)
                    .withJustifySelf(GridItem::JustifySelf::center),
                  GridItem(stereoLinkLabel),
                  GridItem(stereoLink.getControl())
-                   .withWidth(135)
+                   .withWidth(135._p)
                    .withAlignSelf(GridItem::AlignSelf::center)
                    .withJustifySelf(GridItem::JustifySelf::center),
                  GridItem(oversamplingLabel),
                  GridItem(oversampling.getControl())
-                   .withWidth(70)
-                   .withAlignSelf(GridItem::AlignSelf::center)
+                   .withWidth(std::max(60.0L, 70._p))
+                   .withHeight(30._p)
+                   .withAlignSelf(GridItem::AlignSelf::start)
                    .withJustifySelf(GridItem::JustifySelf::center),
                  GridItem(linearPhase.getControl())
-                   .withWidth(120)
+                   .withWidth(130._p)
                    .withAlignSelf(GridItem::AlignSelf::center)
                    .withJustifySelf(GridItem::JustifySelf::center) };
 
   grid.justifyContent = Grid::JustifyContent::center;
   grid.alignContent = Grid::AlignContent::center;
 
-  grid.performLayout(juce::Rectangle(
-    splineEditorSide + vuMeterWidth + 3 * offset + 17, offset + 5, 150, 310));
+  grid.performLayout(
+    juce::Rectangle<int>(splineEditorSide + vuMeterWidth + 3 * offset + 17._p,
+                         offset + 5._p,
+                         150._p,
+                         310._p));
+
+  midSideEditor.getControl().setTopLeftPosition(
+    midSideEditor.getControl().getPosition().x,
+    midSideEditor.getControl().getPosition().y - 6._p);
 
   stereoLink.getControl().setTopLeftPosition(
-    stereoLink.getControl().getPosition().x + 10,
+    stereoLink.getControl().getPosition().x + 10._p,
     stereoLink.getControl().getPosition().y);
 
-  url.setTopLeftPosition(10, getHeight() - 18);
-  url.setSize(160, 16);
+  url.setTopLeftPosition(10._p, getHeight() - 18._p);
+  url.setSize(160._p, 16._p);
 
-  splineEditor.areaInWhichToDrawNodes = juce::Rectangle(
+  splineEditor.areaInWhichToDrawNodes = juce::Rectangle<int>(
     splineEditor.getPosition().x,
     splineEditor.getPosition().x,
     jmax(splineEditor.getWidth(), nodeEditor.getWidth()),
