@@ -260,9 +260,9 @@ CurvessorAudioProcessorEditor::resized()
   url.setTopLeftPosition(10._p, getHeight() - 18._p);
   url.setSize(160._p, 16._p);
 
-  splineEditor.areaInWhichToDrawNodes = juce::Rectangle<int>(
-    splineEditor.getPosition().x,
-    splineEditor.getPosition().x,
-    jmax(splineEditor.getWidth(), nodeEditor.getWidth()),
-    nodeEditor.getPosition().y + nodeEditor.getHeight() + offset);
+  splineEditor.areaInWhichToDrawNodes =
+    juce::Rectangle<int>(splineEditor.getPosition().x,
+                         splineEditor.getPosition().y,
+                         jmax(splineEditor.getWidth(), nodeEditor.getWidth()),
+                         nodeEditor.getBottom() - splineEditor.getPosition().y);
 }
