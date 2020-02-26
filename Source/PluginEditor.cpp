@@ -88,6 +88,9 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   addAndMakeVisible(midSideLabel);
   addAndMakeVisible(url);
 
+  splineEditor.xSuffix = "dB";
+  splineEditor.ySuffix = "dB";
+
   AttachSplineEditorsAndInitialize(splineEditor, nodeEditor);
 
   topologyLabel.setFont(Font(20._p, Font::bold));
@@ -123,6 +126,11 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   outputGainLabels.tableSettings.backgroundColour = backgroundColour;
   inputGainLabels.tableSettings.lineColour = lineColour;
   inputGainLabels.tableSettings.backgroundColour = backgroundColour;
+
+  for (int c = 0; c < 2; ++c) {
+    outputGain.getControl(c).setTextValueSuffix("dB");
+    inputGain.getControl(c).setTextValueSuffix("dB");
+  }
 
   url.setFont({ 14._p, Font::bold });
   url.setJustification(Justification::centred);
