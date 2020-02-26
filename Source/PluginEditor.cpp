@@ -118,14 +118,16 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   tableSettings.backgroundColour = backgroundColour;
   gammaEnvEditor.setTableSettings(tableSettings);
   nodeEditor.setTableSettings(tableSettings);
-  inputGain.tableSettings.lineColour = lineColour;
-  inputGain.tableSettings.backgroundColour = backgroundColour;
-  outputGain.tableSettings.lineColour = lineColour;
-  outputGain.tableSettings.backgroundColour = backgroundColour;
-  outputGainLabels.tableSettings.lineColour = lineColour;
-  outputGainLabels.tableSettings.backgroundColour = backgroundColour;
-  inputGainLabels.tableSettings.lineColour = lineColour;
-  inputGainLabels.tableSettings.backgroundColour = backgroundColour;
+
+  auto const applyTableSettings = [&](auto& linkedControls) {
+    linkedControls.tableSettings.lineColour = lineColour;
+    linkedControls.tableSettings.backgroundColour = backgroundColour;
+  };
+
+  applyTableSettings(inputGain);
+  applyTableSettings(inputGainLabels);
+  applyTableSettings(outputGain);
+  applyTableSettings(outputGainLabels);
 
   for (int c = 0; c < 2; ++c) {
     outputGain.getControl(c).setTextValueSuffix("dB");
