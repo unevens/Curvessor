@@ -107,13 +107,18 @@ CurvessorAudioProcessor::Parameters::Parameters(
 
   stereoLink = CreateFloatParameter("Stereo-Link", 50.0, 0.0, 100.0);
 
+  auto const isNodeActive = [](int nodeIndex) {
+    return nodeIndex >= 3 && nodeIndex <= 6;
+  };
+
   spline = std::unique_ptr<SplineParameters>(
     new SplineParameters("",
                          parameters,
                          CurvessorAudioProcessor::maxNumNodes,
                          { -100.f, 6.f, 0.01f },
                          { -100.f, 6.f, 0.01f },
-                         { -20.f, 20.f, 0.01f }));
+                         { -20.f, 20.f, 0.01f },
+                         isNodeActive));
 
   apvts = std::unique_ptr<AudioProcessorValueTreeState>(
     new AudioProcessorValueTreeState(processor,
