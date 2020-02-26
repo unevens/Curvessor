@@ -113,7 +113,7 @@ CurvessorAudioProcessor::forwardProcess(VecBuffer<Vec2d>& io,
     gc -= env_out;
 
     // safety measure
-    gc = select(env_out < -100.f, min(gc, 0.f), gc);
+    gc = select(env_out < -100.0, min(gc, 0.0), gc);
 
     TO_VUMETER(gc, gain_vumeter, automation_alpha);
 
@@ -166,7 +166,7 @@ CurvessorAudioProcessor::feedbackProcess(VecBuffer<Vec2d>& io,
     gc -= env_out;
 
     // safety measure
-    gc = select(env_out < -100.f, min(gc, 0.f), gc);
+    gc = select(env_out < -100.0, min(gc, 0.0), gc);
 
     TO_VUMETER(gc, gain_vumeter, automation_alpha);
 
@@ -221,7 +221,7 @@ CurvessorAudioProcessor::sidechainProcess(VecBuffer<Vec2d>& io,
     gc -= env_out;
 
     // safety measure
-    gc = select(env_out < -100.f, min(gc, 0.f), gc);
+    gc = select(env_out < -100.0, min(gc, 0.0), gc);
 
     TO_VUMETER(gc, gain_vumeter, automation_alpha);
 
