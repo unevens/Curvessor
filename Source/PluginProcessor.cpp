@@ -108,7 +108,7 @@ CurvessorAudioProcessor::Parameters::Parameters(
   stereoLink = CreateFloatParameter("Stereo-Link", 50.0, 0.0, 100.0);
 
   spline = std::unique_ptr<SplineParameters>(
-    new SplineParameters("Spline",
+    new SplineParameters("",
                          parameters,
                          CurvessorAudioProcessor::maxNumNodes,
                          { -100.f, 6.f, 0.01f },
