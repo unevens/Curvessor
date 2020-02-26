@@ -272,7 +272,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   auto spline = parameters.spline->updateSpline(splines);
 
-  if (parameters.spline->needsReset()) {
+  if (spline && parameters.spline->needsReset()) {
     spline->reset();
   }
 
@@ -297,8 +297,6 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
   }
 
   double const automationAlpha = exp(-frequencyCoef / automationTime);
-
-  spline->setSmoothingFrequency(automationAlpha);
 
   // mid side
 
@@ -326,6 +324,8 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
     return;
   }
+
+  spline->setSmoothingFrequency(automationAlpha);
 
   // oversampling
 
