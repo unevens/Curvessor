@@ -83,7 +83,7 @@ class CurvessorAudioProcessor : public AudioProcessor
 
   VecBuffer<Vec2d> feedbackBuffer{ 1 };
 
-  double automationTime = 50.0;
+  double automationTime = 100.0;
 
   VecBuffer<Vec2d> stereoLink{ 1 };
   VecBuffer<Vec2d> stereoLinkTarget{ 1 };
