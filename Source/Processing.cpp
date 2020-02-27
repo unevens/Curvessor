@@ -122,6 +122,8 @@ CurvessorAudioProcessor::forwardProcess(VecBuffer<Vec2d>& io,
     COMPUTE_SPLINE(spline, numKnots, Vec2d, env_out, gc);
     gc -= env_out;
 
+    SANITIZE_GAIN_REDUCTION(gc, env_out);
+
     TO_VUMETER(gc, gain_vumeter, automation_alpha);
 
     gc = exp(db_to_lin * gc);
