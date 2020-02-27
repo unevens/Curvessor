@@ -107,18 +107,18 @@ CurvessorAudioProcessor::Parameters::Parameters(
 
   stereoLink = CreateFloatParameter("Stereo-Link", 50.0, 0.0, 100.0);
 
-  auto const isNodeActive = [](int nodeIndex) {
-    return nodeIndex >= 3 && nodeIndex <= 6;
+  auto const isKnotActive = [](int knotIndex) {
+    return knotIndex >= 3 && knotIndex <= 6;
   };
 
   spline = std::unique_ptr<SplineParameters>(
     new SplineParameters("",
                          parameters,
-                         CurvessorAudioProcessor::maxNumNodes,
+                         CurvessorAudioProcessor::maxNumKnots,
                          { -100.f, 6.f, 0.01f },
                          { -100.f, 6.f, 0.01f },
                          { -20.f, 20.f, 0.01f },
-                         isNodeActive));
+                         isKnotActive));
 
   apvts = std::unique_ptr<AudioProcessorValueTreeState>(
     new AudioProcessorValueTreeState(processor,
@@ -139,7 +139,7 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 
   , envelopeFollower(Aligned<avec::GammaEnv<Vec2d>>::make())
 
-  , splines(avec::SplineHolder<avec::Spline, Vec2d>::make<maxNumNodes>())
+  , splines(avec::SplineHolder<avec::Spline, Vec2d>::make<maxNumKnots>())
 
   , envelopeFollowerSettings(*envelopeFollower)
 

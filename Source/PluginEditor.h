@@ -38,7 +38,7 @@ private:
   CurvessorAudioProcessor& processor;
 
   SplineEditor splineEditor;
-  SplineNodeEditor nodeEditor;
+  SplineKnotEditor knotEditor;
   GammaEnvEditor gammaEnvEditor;
   GainVuMeter vuMeter;
   AttachedToggle midSideEditor;
