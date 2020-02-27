@@ -11,7 +11,7 @@ But more specifically, as it allows the authoring of response curves _that are n
 ## Features
 
 - The response curves are smoothly automatable splines.
-- Mid/Side Stereo.
+- Optional Mid/Side Stereo processing.
 - Forward, Feedback and Sidechain topologies.
 - All parameters, and all splines, can have different values on the Left channel and on the Right channel - or on the Mid channel and on the Side channel, when in Mid/Side Stero Mode.
 - Up to 32x Oversampling with either Minimum or Linear Phase.
