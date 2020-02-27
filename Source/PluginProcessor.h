@@ -121,7 +121,8 @@ class CurvessorAudioProcessor : public AudioProcessor
                         double const automationAlpha);
 
 public:
-  static constexpr int maxNumKnots = 8;
+  static constexpr int maxNumKnots = 9;
+  static constexpr int maxEditableKnots = maxNumKnots - 1;
 
   // for gui
 

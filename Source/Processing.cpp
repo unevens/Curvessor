@@ -75,14 +75,6 @@ applyGain(double** io,
   vumeter_state =                                                              \
     _mm_add_pd(env, _mm_mul_pd(alpha, _mm_sub_pd(vumeter_state, env)));
 
-#define SANITIZE_GAIN_REDUCTION(gc, env_out)                                   \
-  {                                                                            \
-    auto low_gc = max(gc, 0.0);                                                \
-    low_gc =                                                                   \
-      low_gc + (gc - low_gc) * min(1.0, max(0.0, (env_out + 120) * 0.05));     \
-    gc = select(env_out < -100.0, low_gc, gc);                                 \
-  }
-
 constexpr double ln10 = 2.30258509299404568402;
 constexpr double db_to_lin = ln10 / 20.0;
 
@@ -121,8 +113,6 @@ CurvessorAudioProcessor::forwardProcess(VecBuffer<Vec2d>& io,
     Vec2d gc;
     COMPUTE_SPLINE(spline, numKnots, Vec2d, env_out, gc);
     gc -= env_out;
-
-    SANITIZE_GAIN_REDUCTION(gc, env_out);
 
     TO_VUMETER(gc, gain_vumeter, automation_alpha);
 
@@ -173,8 +163,6 @@ CurvessorAudioProcessor::feedbackProcess(VecBuffer<Vec2d>& io,
     Vec2d gc;
     COMPUTE_SPLINE(spline, numKnots, Vec2d, env_out, gc);
     gc -= env_out;
-
-    SANITIZE_GAIN_REDUCTION(gc, env_out);
 
     TO_VUMETER(gc, gain_vumeter, automation_alpha);
 
@@ -227,8 +215,6 @@ CurvessorAudioProcessor::sidechainProcess(VecBuffer<Vec2d>& io,
     Vec2d gc;
     COMPUTE_SPLINE(spline, numKnots, Vec2d, env_out, gc);
     gc -= env_out;
-
-    SANITIZE_GAIN_REDUCTION(gc, env_out);
 
     TO_VUMETER(gc, gain_vumeter, automation_alpha);
 
