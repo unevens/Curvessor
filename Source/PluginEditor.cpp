@@ -240,19 +240,19 @@ CurvessorAudioProcessorEditor::resized()
       .withWidth(120._p)
       .withAlignSelf(GridItem::AlignSelf::center)
       .withJustifySelf(GridItem::JustifySelf::center),
-    GridItem(smoothingLabel)
-      .withAlignSelf(GridItem::AlignSelf::start)
-      .withJustifySelf(GridItem::JustifySelf::center),
-    GridItem(smoothing.getControl())
-      .withWidth(135._p)
-      .withAlignSelf(GridItem::AlignSelf::start)
-      .withJustifySelf(GridItem::JustifySelf::center),
     GridItem(stereoLinkLabel)
       .withAlignSelf(GridItem::AlignSelf::start)
       .withJustifySelf(GridItem::JustifySelf::center),
     GridItem(stereoLink.getControl())
       .withWidth(135._p)
       .withAlignSelf(GridItem::AlignSelf::center)
+      .withJustifySelf(GridItem::JustifySelf::center),
+    GridItem(smoothingLabel)
+      .withAlignSelf(GridItem::AlignSelf::start)
+      .withJustifySelf(GridItem::JustifySelf::center),
+    GridItem(smoothing.getControl())
+      .withWidth(135._p)
+      .withAlignSelf(GridItem::AlignSelf::start)
       .withJustifySelf(GridItem::JustifySelf::center),
     GridItem(oversamplingLabel).withAlignSelf(GridItem::AlignSelf::start),
     GridItem(oversampling.getControl())
