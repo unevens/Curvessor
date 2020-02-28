@@ -78,6 +78,8 @@ CurvessorAudioProcessor::Parameters::Parameters(
 
   midSide = CreateBoolParameter("Mid-Side", false);
 
+  smoothingTime = CreateFloatParameter("Smoothing-Time", 50.0, 0.0, 500.0, 1.f);
+
   topology =
     CreateChoiceParameter("Topology", { "Forward", "Feedback", "SideChain" });
 
@@ -105,7 +107,7 @@ CurvessorAudioProcessor::Parameters::Parameters(
   envelopeFollower.metric =
     CreateLinkableChoiceParameters("Metric", { "Peak", "RMS" });
 
-  stereoLink = CreateFloatParameter("Stereo-Link", 50.0, 0.0, 100.0);
+  stereoLink = CreateFloatParameter("Stereo-Link", 50.0, 0.0, 500.0, 1.f);
 
   auto const isKnotActive = [](int knotIndex) {
     return knotIndex >= 3 && knotIndex <= 6;

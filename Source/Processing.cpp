@@ -289,7 +289,12 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
       parameters.envelopeFollower.releaseDelay.get(c)->get());
   }
 
-  double const automationAlpha = exp(-frequencyCoef / automationTime);
+  float const smoothingTime = parameters.smoothingTime->get();
+
+  double const automationAlpha =
+    smoothingTime == 0.f
+      ? 0.f
+      : exp(-frequencyCoef / parameters.smoothingTime->get());
 
   // mid side
 

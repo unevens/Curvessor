@@ -58,6 +58,7 @@ class CurvessorAudioProcessor : public AudioProcessor
     LinkableParameter<AudioParameterFloat> outputGain;
     GammaEnvParameters envelopeFollower;
     AudioParameterFloat* stereoLink;
+    AudioParameterFloat* smoothingTime;
     OversamplingParameters oversampling;
 
     std::unique_ptr<SplineParameters> spline;
@@ -83,7 +84,7 @@ class CurvessorAudioProcessor : public AudioProcessor
 
   VecBuffer<Vec2d> feedbackBuffer{ 1 };
 
-  double automationTime = 100.0;
+  double smoothingTime = 100.0;
 
   VecBuffer<Vec2d> stereoLink{ 1 };
   VecBuffer<Vec2d> stereoLinkTarget{ 1 };

@@ -71,6 +71,8 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
                 *p.getCurvessorParameters().apvts,
                 "Linear-Phase-Oversampling")
 
+  , smoothing(*this, *p.getCurvessorParameters().apvts, "Smoothing-Time")
+
   , background(ImageCache::getFromMemory(BinaryData::background_png,
                                          BinaryData::background_pngSize))
 {
@@ -85,7 +87,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   addAndMakeVisible(oversamplingLabel);
   addAndMakeVisible(inputGainLabels);
   addAndMakeVisible(outputGainLabels);
-  addAndMakeVisible(midSideLabel);
+  addAndMakeVisible(smoothingLabel);
   addAndMakeVisible(url);
 
   splineEditor.xSuffix = "dB";
@@ -96,18 +98,21 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   topologyLabel.setFont(Font(20._p, Font::bold));
   oversamplingLabel.setFont(Font(20._p, Font::bold));
   stereoLinkLabel.setFont(Font(20._p, Font::bold));
-  midSideLabel.setFont(Font(20._p, Font::bold));
+  midSideEditor.getControl().setButtonText("Mid Side");
 
   topologyLabel.setJustificationType(Justification::centred);
   oversamplingLabel.setJustificationType(Justification::centred);
   stereoLinkLabel.setJustificationType(Justification::centred);
-  midSideLabel.setJustificationType(Justification::centred);
+
+  smoothing.getControl().setTextValueSuffix("ms");
 
   for (int c = 0; c < 2; ++c) {
     splineEditor.vuMeter[c] = &processor.levelVuMeterResults[c];
   }
 
   linearPhase.getControl().setButtonText("Linear Phase");
+
+  stereoLink.getControl().setTextValueSuffix("%");
 
   lineColour = p.looks.frontColour.darker(1.f);
 
@@ -163,9 +168,10 @@ CurvessorAudioProcessorEditor::paint(Graphics& g)
   g.fillRect(juce::Rectangle<float>(632._p, 10._p, 160._p, 330._p));
 
   g.setColour(lineColour);
-  g.drawRect(632._p, 10._p, 160._p, 80._p, 1);
-  g.drawRect(632._p, 10._p, 160._p, 145._p, 1);
-  g.drawRect(632._p, 10._p, 160._p, 220._p, 1);
+  g.drawRect(632._p, 10._p, 160._p, 65._p, 1);
+  g.drawRect(632._p, 10._p, 160._p, 100._p, 1);
+  g.drawRect(632._p, 10._p, 160._p, 170._p, 1);
+  g.drawRect(632._p, 10._p, 160._p, 240._p, 1);
   g.drawRect(632._p, 10._p, 160._p, 330._p, 1);
 
   g.drawRect(splineEditor.getBounds().expanded(1, 1), 1);
@@ -215,57 +221,59 @@ CurvessorAudioProcessorEditor::resized()
   Grid grid;
   using Track = Grid::TrackInfo;
 
-  grid.templateRows = { Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
+  grid.templateRows = { Track(Grid::Px(30._p)), Track(Grid::Px(40._p)),
+                        Track(Grid::Px(30._p)), Track(Grid::Px(30._p)),
                         Track(Grid::Px(40._p)), Track(Grid::Px(30._p)),
-                        Track(Grid::Px(30._p)), Track(Grid::Px(40._p)),
-                        Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
-                        Track(Grid::Px(30._p)) };
+                        Track(Grid::Px(40._p)), Track(Grid::Px(30._p)),
+                        Track(Grid::Px(30._p)), Track(Grid::Px(30._p)) };
 
   grid.templateColumns = { Track(1_fr) };
 
-  grid.items = { GridItem(topologyLabel),
-                 GridItem(topologyEditor.getControl())
-                   .withWidth(120._p)
-                   .withHeight(30._p)
-                   .withAlignSelf(GridItem::AlignSelf::start)
-                   .withJustifySelf(GridItem::JustifySelf::center),
-                 GridItem(midSideLabel),
-                 GridItem(midSideEditor.getControl())
-                   .withWidth(30._p)
-                   .withAlignSelf(GridItem::AlignSelf::center)
-                   .withJustifySelf(GridItem::JustifySelf::center),
-                 GridItem(stereoLinkLabel),
-                 GridItem(stereoLink.getControl())
-                   .withWidth(135._p)
-                   .withAlignSelf(GridItem::AlignSelf::center)
-                   .withJustifySelf(GridItem::JustifySelf::center),
-                 GridItem(oversamplingLabel),
-                 GridItem(oversampling.getControl())
-                   .withWidth(std::max(60.0L, 70._p))
-                   .withHeight(30._p)
-                   .withAlignSelf(GridItem::AlignSelf::start)
-                   .withJustifySelf(GridItem::JustifySelf::center),
-                 GridItem(linearPhase.getControl())
-                   .withWidth(130._p)
-                   .withAlignSelf(GridItem::AlignSelf::center)
-                   .withJustifySelf(GridItem::JustifySelf::center) };
+  grid.items = {
+    GridItem(topologyLabel),
+    GridItem(topologyEditor.getControl())
+      .withWidth(120._p)
+      .withHeight(30._p)
+      .withAlignSelf(GridItem::AlignSelf::start)
+      .withJustifySelf(GridItem::JustifySelf::center),
+    GridItem(midSideEditor.getControl())
+      .withWidth(120._p)
+      .withAlignSelf(GridItem::AlignSelf::center)
+      .withJustifySelf(GridItem::JustifySelf::center),
+    GridItem(smoothingLabel)
+      .withAlignSelf(GridItem::AlignSelf::start)
+      .withJustifySelf(GridItem::JustifySelf::center),
+    GridItem(smoothing.getControl())
+      .withWidth(135._p)
+      .withAlignSelf(GridItem::AlignSelf::start)
+      .withJustifySelf(GridItem::JustifySelf::center),
+    GridItem(stereoLinkLabel)
+      .withAlignSelf(GridItem::AlignSelf::start)
+      .withJustifySelf(GridItem::JustifySelf::center),
+    GridItem(stereoLink.getControl())
+      .withWidth(135._p)
+      .withAlignSelf(GridItem::AlignSelf::center)
+      .withJustifySelf(GridItem::JustifySelf::center),
+    GridItem(oversamplingLabel).withAlignSelf(GridItem::AlignSelf::start),
+    GridItem(oversampling.getControl())
+      .withWidth(std::max(60.0L, 70._p))
+      .withHeight(30._p)
+      .withAlignSelf(GridItem::AlignSelf::start)
+      .withJustifySelf(GridItem::JustifySelf::center),
+    GridItem(linearPhase.getControl())
+      .withWidth(130._p)
+      .withAlignSelf(GridItem::AlignSelf::start)
+      .withJustifySelf(GridItem::JustifySelf::center)
+  };
 
   grid.justifyContent = Grid::JustifyContent::center;
   grid.alignContent = Grid::AlignContent::center;
 
   grid.performLayout(
     juce::Rectangle<int>(splineEditorSide + vuMeterWidth + 3 * offset + 17._p,
-                         offset + 5._p,
+                         offset - 2._p,
                          150._p,
-                         310._p));
-
-  midSideEditor.getControl().setTopLeftPosition(
-    midSideEditor.getControl().getPosition().x,
-    midSideEditor.getControl().getPosition().y - 6._p);
-
-  stereoLink.getControl().setTopLeftPosition(
-    stereoLink.getControl().getPosition().x + 10._p,
-    stereoLink.getControl().getPosition().y);
+                         330._p));
 
   url.setTopLeftPosition(10._p, getHeight() - 18._p);
   url.setSize(160._p, 16._p);

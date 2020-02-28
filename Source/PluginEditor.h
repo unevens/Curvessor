@@ -42,7 +42,6 @@ private:
   GammaEnvEditor gammaEnvEditor;
   GainVuMeter vuMeter;
   AttachedToggle midSideEditor;
-  Label midSideLabel{ {}, "Mid-Side" };
   AttachedComboBox topologyEditor;
   Label topologyLabel{ {}, "Topology" };
   AttachedComboBox oversampling;
@@ -50,6 +49,8 @@ private:
   Label oversamplingLabel{ {}, "Oversampling" };
   AttachedSlider stereoLink;
   Label stereoLinkLabel{ {}, "Stereo Link" };
+  AttachedSlider smoothing;
+  Label smoothingLabel{ {}, "Smoothing Time" };
   LinkableControl<AttachedSlider> inputGain;
   LinkableControl<AttachedSlider> outputGain;
   ChannelLabels inputGainLabels;
