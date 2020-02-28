@@ -15,6 +15,7 @@ But more specifically, as it allows the authoring of response curves _that are n
 - Forward, Feedback and Sidechain topologies.
 - All parameters, and all splines, can have different values on the Left channel and on the Right channel - or on the Mid channel and on the Side channel, when in Mid/Side Stero Mode.
 - Up to 32x Oversampling with either Minimum Phase or Linear Phase Antialiasing.
+- Customizable smoothing time, used to avoid zips when automating the knots of the splines, the stereo link percentage, and the input and output gains.
 
 ## Build
 
