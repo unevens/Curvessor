@@ -27,21 +27,21 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
   , processor(p)
 
-  , splineEditor(*p.getCurvessorParameters().spline,
+  , spline(*p.getCurvessorParameters().spline,
+           *p.getCurvessorParameters().apvts)
+
+  , selectedKnot(*p.getCurvessorParameters().spline,
                  *p.getCurvessorParameters().apvts)
 
-  , knotEditor(*p.getCurvessorParameters().spline,
-               *p.getCurvessorParameters().apvts)
+  , gammaEnv(*p.getCurvessorParameters().apvts,
+             p.getCurvessorParameters().envelopeFollower)
 
-  , gammaEnvEditor(*p.getCurvessorParameters().apvts,
-                   p.getCurvessorParameters().envelopeFollower)
+  , midSide(*this, *p.getCurvessorParameters().apvts, "Mid-Side")
 
-  , midSideEditor(*this, *p.getCurvessorParameters().apvts, "Mid-Side")
-
-  , topologyEditor(*this,
-                   *p.getCurvessorParameters().apvts,
-                   "Topology",
-                   { "Forward", "Feedback", "SideChain" })
+  , topology(*this,
+             *p.getCurvessorParameters().apvts,
+             "Topology",
+             { "Forward", "Feedback", "SideChain" })
 
   , vuMeter({ { &processor.gainVuMeterResults[0],
                 &processor.gainVuMeterResults[1] } },
@@ -76,11 +76,11 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   , background(ImageCache::getFromMemory(BinaryData::background_png,
                                          BinaryData::background_pngSize))
 {
-  addAndMakeVisible(splineEditor);
-  addAndMakeVisible(knotEditor);
+  addAndMakeVisible(spline);
+  addAndMakeVisible(selectedKnot);
   addAndMakeVisible(inputGain);
   addAndMakeVisible(outputGain);
-  addAndMakeVisible(gammaEnvEditor);
+  addAndMakeVisible(gammaEnv);
   addAndMakeVisible(vuMeter);
   addAndMakeVisible(topologyLabel);
   addAndMakeVisible(stereoLinkLabel);
@@ -90,24 +90,25 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   addAndMakeVisible(smoothingLabel);
   addAndMakeVisible(url);
 
-  splineEditor.xSuffix = "dB";
-  splineEditor.ySuffix = "dB";
+  spline.xSuffix = "dB";
+  spline.ySuffix = "dB";
 
-  AttachSplineEditorsAndInitialize(splineEditor, knotEditor);
+  AttachSplineEditorsAndInitialize(spline, selectedKnot);
 
   topologyLabel.setFont(Font(20._p, Font::bold));
   oversamplingLabel.setFont(Font(20._p, Font::bold));
   stereoLinkLabel.setFont(Font(20._p, Font::bold));
-  midSideEditor.getControl().setButtonText("Mid Side");
+  midSide.getControl().setButtonText("Mid Side");
 
   topologyLabel.setJustificationType(Justification::centred);
   oversamplingLabel.setJustificationType(Justification::centred);
   stereoLinkLabel.setJustificationType(Justification::centred);
+  smoothingLabel.setJustificationType(Justification::centred);
 
   smoothing.getControl().setTextValueSuffix("ms");
 
   for (int c = 0; c < 2; ++c) {
-    splineEditor.vuMeter[c] = &processor.levelVuMeterResults[c];
+    spline.vuMeter[c] = &processor.levelVuMeterResults[c];
   }
 
   linearPhase.getControl().setButtonText("Linear Phase");
@@ -121,8 +122,8 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   auto tableSettings = LinkableControlTable();
   tableSettings.lineColour = lineColour;
   tableSettings.backgroundColour = backgroundColour;
-  gammaEnvEditor.setTableSettings(tableSettings);
-  knotEditor.setTableSettings(tableSettings);
+  gammaEnv.setTableSettings(tableSettings);
+  selectedKnot.setTableSettings(tableSettings);
 
   auto const applyTableSettings = [&](auto& linkedControls) {
     linkedControls.tableSettings.lineColour = lineColour;
@@ -174,7 +175,7 @@ CurvessorAudioProcessorEditor::paint(Graphics& g)
   g.drawRect(632._p, 10._p, 160._p, 240._p, 1);
   g.drawRect(632._p, 10._p, 160._p, 330._p, 1);
 
-  g.drawRect(splineEditor.getBounds().expanded(1, 1), 1);
+  g.drawRect(spline.getBounds().expanded(1, 1), 1);
 }
 void
 CurvessorAudioProcessorEditor::resized()
@@ -185,21 +186,20 @@ CurvessorAudioProcessorEditor::resized()
   constexpr auto vuMeterWidth = 89._p;
   constexpr auto knotEditorHeight = 160._p;
 
-  splineEditor.setTopLeftPosition(offset + 1, offset + 1);
-  splineEditor.setSize(splineEditorSide - 2, splineEditorSide - 2);
+  spline.setTopLeftPosition(offset + 1, offset + 1);
+  spline.setSize(splineEditorSide - 2, splineEditorSide - 2);
 
   vuMeter.setTopLeftPosition(splineEditorSide + 2 * offset, offset);
   vuMeter.setSize(vuMeterWidth, splineEditorSide);
 
-  knotEditor.setTopLeftPosition(offset, splineEditorSide + 2 * offset);
-  knotEditor.setSize(splineEditorSide + offset + vuMeterWidth + 2, 160._p);
+  selectedKnot.setTopLeftPosition(offset, splineEditorSide + 2 * offset);
+  selectedKnot.setSize(splineEditorSide + offset + vuMeterWidth + 2, 160._p);
 
   constexpr auto gammaEnvEditorY =
     splineEditorSide + knotEditorHeight + 3 * offset;
 
-  gammaEnvEditor.setTopLeftPosition(offset, gammaEnvEditorY);
-  gammaEnvEditor.setSize(gammaEnvEditor.fullSizeWidth * uiGlobalScaleFactor,
-                         rowHeight * 4);
+  gammaEnv.setTopLeftPosition(offset, gammaEnvEditorY);
+  gammaEnv.setSize(gammaEnv.fullSizeWidth * uiGlobalScaleFactor, rowHeight * 4);
 
   constexpr auto gainLeft = 3 * offset + splineEditorSide + vuMeterWidth;
   constexpr auto inputGainTop = 350._p;
@@ -231,12 +231,12 @@ CurvessorAudioProcessorEditor::resized()
 
   grid.items = {
     GridItem(topologyLabel),
-    GridItem(topologyEditor.getControl())
+    GridItem(topology.getControl())
       .withWidth(120._p)
       .withHeight(30._p)
       .withAlignSelf(GridItem::AlignSelf::start)
       .withJustifySelf(GridItem::JustifySelf::center),
-    GridItem(midSideEditor.getControl())
+    GridItem(midSide.getControl())
       .withWidth(120._p)
       .withAlignSelf(GridItem::AlignSelf::center)
       .withJustifySelf(GridItem::JustifySelf::center),
@@ -278,9 +278,9 @@ CurvessorAudioProcessorEditor::resized()
   url.setTopLeftPosition(10._p, getHeight() - 18._p);
   url.setSize(160._p, 16._p);
 
-  splineEditor.areaInWhichToDrawKnots =
-    juce::Rectangle<int>(splineEditor.getPosition().x,
-                         splineEditor.getPosition().y,
-                         jmax(splineEditor.getWidth(), knotEditor.getWidth()),
-                         knotEditor.getBottom() - splineEditor.getPosition().y);
+  spline.areaInWhichToDrawKnots =
+    juce::Rectangle<int>(spline.getPosition().x,
+                         spline.getPosition().y,
+                         jmax(spline.getWidth(), selectedKnot.getWidth()),
+                         selectedKnot.getBottom() - spline.getPosition().y);
 }

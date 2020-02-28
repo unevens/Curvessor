@@ -37,12 +37,12 @@ public:
 private:
   CurvessorAudioProcessor& processor;
 
-  SplineEditor splineEditor;
-  SplineKnotEditor knotEditor;
-  GammaEnvEditor gammaEnvEditor;
+  SplineEditor spline;
+  SplineKnotEditor selectedKnot;
+  GammaEnvEditor gammaEnv;
   GainVuMeter vuMeter;
-  AttachedToggle midSideEditor;
-  AttachedComboBox topologyEditor;
+  AttachedToggle midSide;
+  AttachedComboBox topology;
   Label topologyLabel{ {}, "Topology" };
   AttachedComboBox oversampling;
   AttachedToggle linearPhase;
@@ -61,7 +61,6 @@ private:
   Colour backgroundColour = Colours::black.withAlpha(0.6f);
 
   Image background;
-
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CurvessorAudioProcessorEditor)
 };
