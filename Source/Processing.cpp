@@ -242,7 +242,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   double* ioAudio[2] = { buffer.getWritePointer(0), buffer.getWritePointer(1) };
 
-  // get the oversampling processors
+  // prepare to process
 
   oversamplingGetter.update();
   auto& oversampling = oversamplingGetter.get();
@@ -292,9 +292,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
   float const smoothingTime = parameters.smoothingTime->get();
 
   double const automationAlpha =
-    smoothingTime == 0.f
-      ? 0.f
-      : exp(-frequencyCoef / parameters.smoothingTime->get());
+    smoothingTime == 0.f ? 0.f : exp(-frequencyCoef / smoothingTime);
 
   // mid side
 
