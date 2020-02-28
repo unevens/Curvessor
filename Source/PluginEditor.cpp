@@ -93,7 +93,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   spline.xSuffix = "dB";
   spline.ySuffix = "dB";
 
-  AttachSplineEditorsAndInitialize(spline, selectedKnot, 3);
+  attachAndInitializeSplineEditors(spline, selectedKnot, 3);
 
   topologyLabel.setFont(Font(20._p, Font::bold));
   oversamplingLabel.setFont(Font(20._p, Font::bold));
