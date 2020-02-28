@@ -135,7 +135,8 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 #ifndef JucePlugin_PreferredChannelConfigurations
   : AudioProcessor(BusesProperties()
                      .withInput("Input", AudioChannelSet::stereo(), true)
-                     .withOutput("Output", AudioChannelSet::stereo(), true))
+                     .withOutput("Output", AudioChannelSet::stereo(), true)
+                     .withInput("Sidechain", AudioChannelSet::stereo()))
 #endif
 
   , parameters(*this)
@@ -221,8 +222,11 @@ CurvessorAudioProcessor::isBusesLayoutSupported(
   if (layouts.getMainOutputChannels() != 2) {
     return false;
   }
-  if (layouts.getMainInputChannels() == 2 ||
-      layouts.getMainInputChannels() == 4) {
+  if (layouts.getMainInputChannels() != 2) {
+    return false;
+  }
+  int const sidechainChannels = layouts.getNumChannels(true, 1);
+  if (sidechainChannels == 2 || sidechainChannels == 0) {
     return true;
   }
   return false;
