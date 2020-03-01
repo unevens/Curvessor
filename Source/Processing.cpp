@@ -58,22 +58,28 @@ applyGain(double** io,
   }
 }
 
-#define APPLY_STEREO_LINK(io, stereo_link, stereo_link_target, alpha)          \
-  {                                                                            \
-    __m128d mean =                                                             \
-      _mm_mul_pd(_mm_set1_pd(0.5),                                             \
-                 _mm_add_pd(io, _mm_shuffle_pd(io, io, _MM_SHUFFLE2(0, 1))));  \
-                                                                               \
-    stereo_link = _mm_add_pd(                                                  \
-      stereo_link_target,                                                      \
-      _mm_mul_pd(alpha, _mm_sub_pd(stereo_link, stereo_link_target)));         \
-                                                                               \
-    io = _mm_add_pd(io, _mm_mul_pd(stereo_link, _mm_sub_pd(mean, io)));        \
-  }
+static inline __m128d
+applyStereoLink(__m128d in,
+                __m128d& stereo_link,
+                __m128d& stereo_link_target,
+                __m128d alpha)
+{
+  __m128d mean =
+    _mm_mul_pd(_mm_set1_pd(0.5),
+               _mm_add_pd(in, _mm_shuffle_pd(in, in, _MM_SHUFFLE2(0, 1))));
 
-#define TO_VUMETER(env, vumeter_state, alpha)                                  \
-  vumeter_state =                                                              \
-    _mm_add_pd(env, _mm_mul_pd(alpha, _mm_sub_pd(vumeter_state, env)));
+  stereo_link =
+    _mm_add_pd(stereo_link_target,
+               _mm_mul_pd(alpha, _mm_sub_pd(stereo_link, stereo_link_target)));
+
+  return _mm_add_pd(in, _mm_mul_pd(stereo_link, _mm_sub_pd(mean, in)));
+}
+
+__m128d
+toVumeter(__m128d vumeter_state, __m128d env, __m128d alpha)
+{
+  return _mm_add_pd(env, _mm_mul_pd(alpha, _mm_sub_pd(vumeter_state, env)));
+}
 
 constexpr double ln10 = 2.30258509299404568402;
 constexpr double db_to_lin = ln10 / 20.0;
@@ -97,27 +103,27 @@ CurvessorAudioProcessor::forwardProcess(
   __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer[0]);
   __m128d automation_alpha = _mm_set1_pd(automationAlpha);
 
-  // spline->reset();
+  int const numSamples = io.getNumSamples();
 
-  for (int i = 0; i < io.getNumSamples(); ++i) {
+  for (int i = 0; i < numSamples; ++i) {
 
     Vec2d in = io[i];
 
     SPILINE_AUTOMATION(spline, automator, numKnots, Vec2d);
 
-    Vec2d env_out;
+    __m128d env_out;
     COMPUTE_GAMMAENV(envelopeFollower, Vec2d, in, env_out);
 
-    APPLY_STEREO_LINK(
+    env_out = applyStereoLink(
       env_out, stereo_link, stereo_link_target, automation_alpha);
 
-    TO_VUMETER(env_out, level_vumeter, automation_alpha);
+    level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
     Vec2d gc;
     COMPUTE_SPLINE(spline, numKnots, Vec2d, env_out, gc);
     gc -= env_out;
 
-    TO_VUMETER(gc, gain_vumeter, automation_alpha);
+    gain_vumeter = toVumeter(gain_vumeter, gc, automation_alpha);
 
     gc = exp(db_to_lin * gc);
 
@@ -152,25 +158,27 @@ CurvessorAudioProcessor::feedbackProcess(
 
   Vec2d env_in = feedbackBuffer[0];
 
-  for (int i = 0; i < io.getNumSamples(); ++i) {
+  int const numSamples = io.getNumSamples();
+
+  for (int i = 0; i < numSamples; ++i) {
 
     Vec2d in = io[i];
 
     SPILINE_AUTOMATION(spline, automator, numKnots, Vec2d);
 
-    Vec2d env_out;
+    __m128d env_out;
     COMPUTE_GAMMAENV(envelopeFollower, Vec2d, env_in, env_out);
 
-    APPLY_STEREO_LINK(
+    env_out = applyStereoLink(
       env_out, stereo_link, stereo_link_target, automation_alpha);
 
-    TO_VUMETER(env_out, level_vumeter, automation_alpha);
+    level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
     Vec2d gc;
     COMPUTE_SPLINE(spline, numKnots, Vec2d, env_out, gc);
     gc -= env_out;
 
-    TO_VUMETER(gc, gain_vumeter, automation_alpha);
+    gain_vumeter = toVumeter(gain_vumeter, gc, automation_alpha);
 
     gc = exp(db_to_lin * gc);
 
@@ -206,26 +214,27 @@ CurvessorAudioProcessor::sidechainProcess(
   __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer[0]);
   __m128d automation_alpha = _mm_set1_pd(automationAlpha);
 
-  for (int i = 0; i < io.getNumSamples(); ++i) {
+  int const numSamples = io.getNumSamples();
 
+  for (int i = 0; i < numSamples; ++i) {
     Vec2d in = io[i];
 
     SPILINE_AUTOMATION(spline, automator, numKnots, Vec2d);
 
     Vec2d env_in = sidechain[i];
-    Vec2d env_out;
+    __m128d env_out;
     COMPUTE_GAMMAENV(envelopeFollower, Vec2d, env_in, env_out);
 
-    APPLY_STEREO_LINK(
+    env_out = applyStereoLink(
       env_out, stereo_link, stereo_link_target, automation_alpha);
 
-    TO_VUMETER(env_out, level_vumeter, automation_alpha);
+    level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
     Vec2d gc;
     COMPUTE_SPLINE(spline, numKnots, Vec2d, env_out, gc);
     gc -= env_out;
 
-    TO_VUMETER(gc, gain_vumeter, automation_alpha);
+    gain_vumeter = toVumeter(gain_vumeter, gc, automation_alpha);
 
     gc = exp(db_to_lin * gc);
 
