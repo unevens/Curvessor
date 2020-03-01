@@ -74,7 +74,7 @@ class CurvessorAudioProcessor : public AudioProcessor
 
   // splines
 
-  avec::SplineHolder<avec::Spline, Vec2d> splines;
+  avec::SplineHolder<Vec2d> splines;
 
   // envelope followers
 
@@ -110,15 +110,18 @@ class CurvessorAudioProcessor : public AudioProcessor
 
   void forwardProcess(VecBuffer<Vec2d>& io,
                       avec::SplineInterface<Vec2d>* spline,
+                      avec::SplineAutomatorInterface<Vec2d>* automator,
                       double const automationAlpha);
 
   void feedbackProcess(VecBuffer<Vec2d>& io,
                        avec::SplineInterface<Vec2d>* spline,
+                      avec::SplineAutomatorInterface<Vec2d>* automator,
                        double const automationAlpha);
 
   void sidechainProcess(VecBuffer<Vec2d>& io,
                         VecBuffer<Vec2d>& sidechain,
                         avec::SplineInterface<Vec2d>* spline,
+                      avec::SplineAutomatorInterface<Vec2d>* automator,
                         double const automationAlpha);
 
 public:
