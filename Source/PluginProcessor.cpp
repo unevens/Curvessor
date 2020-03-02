@@ -199,7 +199,9 @@ void
 CurvessorAudioProcessor::reset()
 {
   envelopeFollower->reset();
+
   parameters.spline->updateSpline(splines);
+  splines.reset();
 
   levelVuMeterBuffer[0] = -200.0;
   gainVuMeterBuffer[0] = 0.f;
