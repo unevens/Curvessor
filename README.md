@@ -39,7 +39,7 @@ VST and VST3 binaries are available at https://www.unevens.net/curvessor.html.
     - [My fork of the HIIR](https://github.com/unevens/hiir) library by Laurent de Soras, *"a 2x Upsampler/Downsampler with two-path polyphase IIR anti-aliasing filtering"*. My fork adds support for double precision floating-point numbers, and AVX instructions.
     - [My fork](https://github.com/unevens/r8brain/tree/include)  of [r8brain-free-src](https://github.com/avaneev/r8brain-free-src), *"an high-quality pro
   audio sample rate converter / resampler C++ library"* by Aleksey Vaneev.
-- [avec](https://github.com/unevens/avec), my toolbox/stash/library for SIMD and audio, which uses Agner Fog's [vectorclass](https://github.com/vectorclass/version2) and [Boost.Align](https://www.boost.org/doc/libs/1_71_0/doc/html/align.html).
+- [audio-dsp](https://github.com/unevens/audio-dsp), my toolbox for audio dsp and SIMD instructions, which uses Agner Fog's [vectorclass](https://github.com/vectorclass/version2) and [Boost.Align](https://www.boost.org/doc/libs/1_71_0/doc/html/align.html).
 - [gamma-env](https://github.com/avaneev/gammaenv): *"DSP S-curve envelope signal generator"*, by Aleksey Vaneev. Curvessor uses a SIMD optimized version of gammaenv that I wrote specifically for it. See the files `oversimple/avec/dsp/GammaEnv.hpp` and `oversimple/avec/dsp/GammaEnvMacro.hpp`.
 
 Curvessor is released under the GNU GPLv3 license.
