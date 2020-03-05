@@ -24,8 +24,8 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 #include "OversamplingParameters.h"
 #include "SimpleLookAndFeel.h"
 #include "SplineParameters.h"
-#include "avec/dsp/GammaEnv.hpp"
-#include "avec/dsp/Spline.hpp"
+#include "adsp/GammaEnv.hpp"
+#include "adsp/Spline.hpp"
 #include "oversimple/AsyncOversampling.hpp"
 #include <JuceHeader.h>
 
@@ -74,13 +74,13 @@ class CurvessorAudioProcessor : public AudioProcessor
 
   // splines
 
-  avec::SplineHolder<Vec2d> splines;
+  adsp::SplineHolder<Vec2d> splines;
 
   // envelope followers
 
-  aligned_ptr<avec::GammaEnv<Vec2d>> envelopeFollower;
+  aligned_ptr<adsp::GammaEnv<Vec2d>> envelopeFollower;
 
-  avec::GammaEnvSettings<Vec2d> envelopeFollowerSettings;
+  adsp::GammaEnvSettings<Vec2d> envelopeFollowerSettings;
 
   VecBuffer<Vec2d> feedbackBuffer{ 1 };
 
@@ -109,19 +109,19 @@ class CurvessorAudioProcessor : public AudioProcessor
   // processing
 
   void forwardProcess(VecBuffer<Vec2d>& io,
-                      avec::SplineInterface<Vec2d>* spline,
-                      avec::SplineAutomatorInterface<Vec2d>* automator,
+                      adsp::SplineInterface<Vec2d>* spline,
+                      adsp::SplineAutomatorInterface<Vec2d>* automator,
                       double const automationAlpha);
 
   void feedbackProcess(VecBuffer<Vec2d>& io,
-                       avec::SplineInterface<Vec2d>* spline,
-                      avec::SplineAutomatorInterface<Vec2d>* automator,
+                       adsp::SplineInterface<Vec2d>* spline,
+                       adsp::SplineAutomatorInterface<Vec2d>* automator,
                        double const automationAlpha);
 
   void sidechainProcess(VecBuffer<Vec2d>& io,
                         VecBuffer<Vec2d>& sidechain,
-                        avec::SplineInterface<Vec2d>* spline,
-                      avec::SplineAutomatorInterface<Vec2d>* automator,
+                        adsp::SplineInterface<Vec2d>* spline,
+                        adsp::SplineAutomatorInterface<Vec2d>* automator,
                         double const automationAlpha);
 
 public:

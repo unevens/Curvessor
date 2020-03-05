@@ -18,8 +18,8 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #include "PluginProcessor.h"
-#include "avec/dsp/GammaEnvMacro.hpp"
-#include "avec/dsp/SplineMacro.hpp"
+#include "adsp/GammaEnvMacro.hpp"
+#include "adsp/SplineMacro.hpp"
 
 static void
 leftRightToMidSide(double** io, int const n)
@@ -87,8 +87,8 @@ constexpr double db_to_lin = ln10 / 20.0;
 void
 CurvessorAudioProcessor::forwardProcess(
   VecBuffer<Vec2d>& io,
-  avec::SplineInterface<Vec2d>* spline,
-  avec::SplineAutomatorInterface<Vec2d>* automator,
+  adsp::SplineInterface<Vec2d>* spline,
+  adsp::SplineAutomatorInterface<Vec2d>* automator,
   double const automationAlpha)
 {
   int const numKnots = spline->getNumKnots();
@@ -140,8 +140,8 @@ CurvessorAudioProcessor::forwardProcess(
 void
 CurvessorAudioProcessor::feedbackProcess(
   VecBuffer<Vec2d>& io,
-  avec::SplineInterface<Vec2d>* spline,
-  avec::SplineAutomatorInterface<Vec2d>* automator,
+  adsp::SplineInterface<Vec2d>* spline,
+  adsp::SplineAutomatorInterface<Vec2d>* automator,
   double const automationAlpha)
 {
   int const numKnots = spline->getNumKnots();
@@ -198,8 +198,8 @@ void
 CurvessorAudioProcessor::sidechainProcess(
   VecBuffer<Vec2d>& io,
   VecBuffer<Vec2d>& sidechain,
-  avec::SplineInterface<Vec2d>* spline,
-  avec::SplineAutomatorInterface<Vec2d>* automator,
+  adsp::SplineInterface<Vec2d>* spline,
+  adsp::SplineAutomatorInterface<Vec2d>* automator,
   double const automationAlpha)
 {
   int const numKnots = spline->getNumKnots();

@@ -141,9 +141,9 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 
   , parameters(*this)
 
-  , envelopeFollower(Aligned<avec::GammaEnv<Vec2d>>::make())
+  , envelopeFollower(Aligned<adsp::GammaEnv<Vec2d>>::make())
 
-  , splines(avec::SplineHolder<Vec2d>::make<maxNumKnots>(true))
+  , splines(adsp::SplineHolder<Vec2d>::make<maxNumKnots>(true))
 
   , envelopeFollowerSettings(*envelopeFollower)
 
