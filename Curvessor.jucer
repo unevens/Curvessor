@@ -4,9 +4,16 @@
               cppLanguageStandard="17" pluginFormats="buildAU,buildVST,buildVST3"
               companyName="unevens" companyCopyright="Copyright Dario Mambro 2019"
               companyWebsite="www.unevens.net" companyEmail="hi@unevens.net"
-              headerPath="../../oversimple&#10;../../oversimple/avec&#10;../../oversimple/avec/vectorclass&#10;../../oversimple/r8brain&#10;../../juicy&#10;$(BOOST_INCLUDEDIR)&#10;"
+              headerPath="../../audio-dsp&#10;../../oversimple&#10;../../oversimple/avec&#10;../../oversimple/avec/vectorclass&#10;../../oversimple/r8brain&#10;../../juicy&#10;$(BOOST_INCLUDEDIR)&#10;"
               defines="R8B_PFFFT_DOUBLE=1&#10;NOMINMAX=1">
   <MAINGROUP id="Ayh0pr" name="Curvessor">
+    <GROUP id="{215C9066-A75F-F5CA-873A-FAAC46F3DE3D}" name="audio-dsp">
+      <FILE id="t4cMMj" name="GammaEnv.hpp" compile="0" resource="0" file="audio-dsp/adsp/GammaEnv.hpp"/>
+      <FILE id="b6kFYd" name="GammaEnvMacro.hpp" compile="0" resource="0"
+            file="audio-dsp/adsp/GammaEnvMacro.hpp"/>
+      <FILE id="JsO0lR" name="Spline.hpp" compile="0" resource="0" file="audio-dsp/adsp/Spline.hpp"/>
+      <FILE id="mQ5TfS" name="SplineMacro.hpp" compile="0" resource="0" file="audio-dsp/adsp/SplineMacro.hpp"/>
+    </GROUP>
     <GROUP id="{EB05EC87-04BF-C292-EA04-5ABBF5D410E0}" name="Images">
       <FILE id="sbku7d" name="background.png" compile="0" resource="1" file="Images/background.png"/>
     </GROUP>
@@ -65,13 +72,6 @@
         <FILE id="p27CiT" name="r8butil.h" compile="0" resource="0" file="oversimple/r8brain/r8butil.h"/>
       </GROUP>
       <GROUP id="{6AD72D82-253F-6771-1CD7-80CD51492194}" name="avec">
-        <GROUP id="{B2F4726F-AC34-1A27-6B46-1B0E6A7828F2}" name="dsp">
-          <FILE id="Ho0UFd" name="GammaEnv.hpp" compile="0" resource="0" file="oversimple/avec/avec/dsp/GammaEnv.hpp"/>
-          <FILE id="QLH7go" name="GammaEnvMacro.hpp" compile="0" resource="0"
-                file="oversimple/avec/avec/dsp/GammaEnvMacro.hpp"/>
-          <FILE id="qOrkH0" name="Spline.hpp" compile="0" resource="0" file="oversimple/avec/avec/dsp/Spline.hpp"/>
-          <FILE id="ysveHo" name="SplineMacro.hpp" compile="0" resource="0" file="oversimple/avec/avec/dsp/SplineMacro.hpp"/>
-        </GROUP>
         <GROUP id="{17412750-A4A0-D636-61BF-639D10859B39}" name="vcl">
           <FILE id="XKlllf" name="instrset.h" compile="0" resource="0" file="oversimple/avec/vectorclass/instrset.h"/>
           <FILE id="HbQ70L" name="instrset_detect.cpp" compile="1" resource="0"

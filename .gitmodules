@@ -4,3 +4,6 @@
 [submodule "juicy"]
 	path = juicy
 	url = https://github.com/unevens/juicy
+[submodule "audio-dsp"]
+	path = audio-dsp
+	url = https://github.com/unevens/audio-dsp
