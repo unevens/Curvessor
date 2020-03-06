@@ -88,9 +88,11 @@ CurvessorAudioProcessor::Parameters::Parameters(
                    createWrappedBoolParameter("Linear-Phase-Oversampling",
                                               false) };
 
-  inputGain = CreateLinkableFloatParameters("Input-Gain", 0.f, -48.f, +48.f);
+  inputGain = CreateLinkableFloatParameters("Input-Gain", 0.0, -48.0, 48.0);
 
-  outputGain = CreateLinkableFloatParameters("Output-Gain", 0.f, -48.f, +48.f);
+  outputGain = CreateLinkableFloatParameters("Output-Gain", 0.0, -48.0, 48.0);
+
+  wet = CreateLinkableFloatParameters("Wet", 100.0, 0.0, 100.0, 1.0);
 
   envelopeFollower.attack =
     CreateLinkableFloatParameters("Attack", 20.0, 0.1, 2000.0);
@@ -150,7 +152,7 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
   , asyncOversampling([this] {
     auto oversampling = OversamplingSettings{};
     oversampling.numScalarToVecUpsamplers = 2;
-    oversampling.numVecToScalarDownsamplers = 1;
+    oversampling.numVecToVecDownsamplers = 2;
     oversampling.numChannels = 2;
     oversampling.updateLatency = [this](int latency) {
       setLatencySamples(latency);
@@ -188,6 +190,8 @@ CurvessorAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
     oversampling.numSamplesPerBlock = samplesPerBlock;
   });
 
+  dryBuffer.setNumSamples(samplesPerBlock);
+
   floatToDouble = AudioBuffer<double>(4, samplesPerBlock);
 
   reset();
@@ -213,6 +217,7 @@ CurvessorAudioProcessor::reset()
   for (int c = 0; c < 2; ++c) {
     inputGain[c] = exp(db_to_lin * parameters.inputGain.get(c)->get());
     outputGain[c] = exp(db_to_lin * parameters.outputGain.get(c)->get());
+    wetAmount[c] = 0.01 * parameters.wet.get(c)->get();
     sidechainInputGain[c] = inputGain[c];
   }
 }

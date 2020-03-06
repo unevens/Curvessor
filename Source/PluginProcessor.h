@@ -56,6 +56,7 @@ class CurvessorAudioProcessor : public AudioProcessor
     AudioParameterChoice* topology;
     LinkableParameter<AudioParameterFloat> inputGain;
     LinkableParameter<AudioParameterFloat> outputGain;
+    LinkableParameter<AudioParameterFloat> wet;
     GammaEnvParameters envelopeFollower;
     AudioParameterFloat* stereoLink;
     AudioParameterFloat* smoothingTime;
@@ -91,6 +92,9 @@ class CurvessorAudioProcessor : public AudioProcessor
   double inputGain[2] = { 1.0, 1.0 };
   double sidechainInputGain[2] = { 1.0, 1.0 };
   double outputGain[2] = { 1.0, 1.0 };
+  double wetAmount[2] = { 1.0, 1.0 };
+
+  ScalarBuffer<double> dryBuffer{ 2 };
 
   // buffer for single precision processing call
   AudioBuffer<double> floatToDouble;

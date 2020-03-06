@@ -53,6 +53,7 @@ private:
   Label smoothingLabel{ {}, "Smoothing Time" };
   LinkableControl<AttachedSlider> inputGain;
   LinkableControl<AttachedSlider> outputGain;
+  LinkableControl<AttachedSlider> wet;
   ChannelLabels inputGainLabels;
   ChannelLabels outputGainLabels;
   TextEditor url;

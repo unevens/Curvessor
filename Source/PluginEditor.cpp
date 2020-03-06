@@ -56,6 +56,10 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
                "Output Gain",
                p.getCurvessorParameters().outputGain)
 
+  , wet(*p.getCurvessorParameters().apvts,
+        "Wet",
+        p.getCurvessorParameters().wet)
+
   , stereoLink(*this, *p.getCurvessorParameters().apvts, "Stereo-Link")
 
   , inputGainLabels(*p.getCurvessorParameters().apvts, "Mid-Side")
@@ -80,6 +84,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   addAndMakeVisible(selectedKnot);
   addAndMakeVisible(inputGain);
   addAndMakeVisible(outputGain);
+  addAndMakeVisible(wet);
   addAndMakeVisible(gammaEnv);
   addAndMakeVisible(vuMeter);
   addAndMakeVisible(topologyLabel);
@@ -134,6 +139,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   applyTableSettings(inputGainLabels);
   applyTableSettings(outputGain);
   applyTableSettings(outputGainLabels);
+  applyTableSettings(wet);
 
   for (int c = 0; c < 2; ++c) {
     outputGain.getControl(c).setTextValueSuffix("dB");
@@ -155,7 +161,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   url.setText("www.unevens.net", dontSendNotification);
   url.setJustification(Justification::left);
 
-  setSize(814._p, 890._p);
+  setSize(885._p, 966._p);
 }
 
 CurvessorAudioProcessorEditor::~CurvessorAudioProcessorEditor() {}
@@ -166,14 +172,14 @@ CurvessorAudioProcessorEditor::paint(Graphics& g)
   g.drawImage(background, getLocalBounds().toFloat());
 
   g.setColour(backgroundColour);
-  g.fillRect(juce::Rectangle<float>(632._p, 10._p, 160._p, 330._p));
+  g.fillRect(juce::Rectangle<float>(704._p, 10._p, 160._p, 400._p));
 
   g.setColour(lineColour);
-  g.drawRect(632._p, 10._p, 160._p, 65._p, 1);
-  g.drawRect(632._p, 10._p, 160._p, 100._p, 1);
-  g.drawRect(632._p, 10._p, 160._p, 170._p, 1);
-  g.drawRect(632._p, 10._p, 160._p, 240._p, 1);
-  g.drawRect(632._p, 10._p, 160._p, 330._p, 1);
+  g.drawRect(704._p, 10._p, 160._p, 75._p, 1);
+  g.drawRect(704._p, 10._p, 160._p, 120._p, 1);
+  g.drawRect(704._p, 10._p, 160._p, 200._p, 1);
+  g.drawRect(704._p, 10._p, 160._p, 280._p, 1);
+  g.drawRect(704._p, 10._p, 160._p, 400._p, 1);
 
   g.drawRect(spline.getBounds().expanded(1, 1), 1);
 }
@@ -182,7 +188,7 @@ CurvessorAudioProcessorEditor::resized()
 {
   constexpr auto offset = 10._p;
   constexpr auto rowHeight = 40._p;
-  constexpr auto splineEditorSide = 500._p;
+  constexpr auto splineEditorSide = 572._p;
   constexpr auto vuMeterWidth = 89._p;
   constexpr auto knotEditorHeight = 160._p;
 
@@ -201,16 +207,18 @@ CurvessorAudioProcessorEditor::resized()
   gammaEnv.setTopLeftPosition(offset, gammaEnvEditorY);
   gammaEnv.setSize(gammaEnv.fullSizeWidth * uiGlobalScaleFactor, rowHeight * 4);
 
+  wet.setTopLeftPosition(gammaEnv.getRight() - 2, gammaEnvEditorY);
+  wet.setSize(140._p + 1, rowHeight * 4);
+
   constexpr auto gainLeft = 3 * offset + splineEditorSide + vuMeterWidth;
-  constexpr auto inputGainTop = 350._p;
+  auto const outputGainTop = splineEditorSide + 2 * offset;
+  auto const inputGainTop = outputGainTop - offset - 4 * rowHeight;
 
   inputGainLabels.setTopLeftPosition(gainLeft, inputGainTop);
   inputGainLabels.setSize(50._p, 160._p);
 
   inputGain.setTopLeftPosition(gainLeft + 50._p - 1, inputGainTop);
   inputGain.setSize(136._p, 160._p);
-
-  constexpr auto outputGainTop = inputGainTop + 160._p + offset;
 
   outputGainLabels.setTopLeftPosition(gainLeft, outputGainTop);
   outputGainLabels.setSize(50._p, 160._p);
@@ -221,11 +229,11 @@ CurvessorAudioProcessorEditor::resized()
   Grid grid;
   using Track = Grid::TrackInfo;
 
-  grid.templateRows = { Track(Grid::Px(30._p)), Track(Grid::Px(40._p)),
-                        Track(Grid::Px(30._p)), Track(Grid::Px(30._p)),
-                        Track(Grid::Px(40._p)), Track(Grid::Px(30._p)),
-                        Track(Grid::Px(40._p)), Track(Grid::Px(30._p)),
-                        Track(Grid::Px(30._p)), Track(Grid::Px(30._p)) };
+  grid.templateRows = { Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
+                        Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
+                        Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
+                        Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
+                        Track(Grid::Px(40._p)), Track(Grid::Px(40._p)) };
 
   grid.templateColumns = { Track(1_fr) };
 
@@ -273,7 +281,7 @@ CurvessorAudioProcessorEditor::resized()
     juce::Rectangle<int>(splineEditorSide + vuMeterWidth + 3 * offset + 17._p,
                          offset - 2._p,
                          150._p,
-                         330._p));
+                         400._p));
 
   url.setTopLeftPosition(10._p, getHeight() - 18._p);
   url.setSize(160._p, 16._p);

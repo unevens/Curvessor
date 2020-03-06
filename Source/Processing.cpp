@@ -283,35 +283,71 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   auto [spline, automator] = parameters.spline->updateSpline(splines);
 
-  double const frequencyCoef = 1000.0 * MathConstants<double>::twoPi /
-                               (getSampleRate() * oversampling.getRate());
+  double const frequencyCoef =
+    1000.0 * MathConstants<double>::twoPi / (getSampleRate());
+
+  double const upsampledFrequencyCoef = frequencyCoef / oversampling.getRate();
+
+  float const smoothingTime = parameters.smoothingTime->get();
+
+  double const automationAlpha =
+    smoothingTime == 0.f ? 0.f : exp(-upsampledFrequencyCoef / smoothingTime);
+
+  double const upsampledAutomationAlpha =
+    smoothingTime == 0.f ? 0.f : exp(-upsampledFrequencyCoef / smoothingTime);
 
   double inputGainTarget[2];
   double outputGainTarget[2];
+  double wetAmountTarget[2];
 
   for (int c = 0; c < 2; ++c) {
 
     outputGainTarget[c] = exp(db_to_lin * parameters.outputGain.get(c)->get());
     inputGainTarget[c] = exp(db_to_lin * parameters.inputGain.get(c)->get());
 
+    wetAmount[c] = parameters.wet.get(c)->get();
+
     envelopeFollowerSettings.setup(
       c,
       parameters.envelopeFollower.metric.get(c)->getIndex() == 1,
-      frequencyCoef / parameters.envelopeFollower.attack.get(c)->get(),
-      frequencyCoef / parameters.envelopeFollower.release.get(c)->get(),
+      upsampledFrequencyCoef / parameters.envelopeFollower.attack.get(c)->get(),
+      upsampledFrequencyCoef /
+        parameters.envelopeFollower.release.get(c)->get(),
       parameters.envelopeFollower.attackDelay.get(c)->get(),
       parameters.envelopeFollower.releaseDelay.get(c)->get());
   }
 
-  float const smoothingTime = parameters.smoothingTime->get();
+  if (automator) {
+    automator->setSmoothingAlpha(upsampledAutomationAlpha);
+  }
 
-  double const automationAlpha =
-    smoothingTime == 0.f ? 0.f : exp(-frequencyCoef / smoothingTime);
+  bool const isWetPassNeeded = [&] {
+    double m =
+      wetAmountTarget[0] * wetAmountTarget[1] * wetAmount[0] * wetAmount[1];
+    if (m == 1.0) {
+      return false;
+    }
+    if (m == 0.0) {
+      return !(wetAmountTarget[0] == 0.0 && wetAmountTarget[1] == 0.0 &&
+               wetAmount[0] == 0.0 && wetAmount[1] == 0.0);
+    }
+    return true;
+  }();
+
+  bool const isBypassing = !isWetPassNeeded && (wetAmount[0] == 0.0);
 
   // mid side
 
   if (isMidSideEnabled) {
     leftRightToMidSide(ioAudio, numSamples);
+  }
+
+  // copy the dry signal
+
+  dryBuffer.setNumSamples(numSamples);
+
+  for (int c = 0; c < 2; ++c) {
+    std::copy(ioAudio[c], ioAudio[c] + numSamples, dryBuffer.get()[c]);
   }
 
   // input gain
@@ -335,8 +371,6 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
     return;
   }
 
-  automator->setSmoothingAlpha(automationAlpha);
-
   // oversampling
 
   oversampling.prepareBuffers(numSamples); // extra safety measure
@@ -352,7 +386,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
   }
 
   auto& upsampledBuffer = oversampling.scalarToVecUpsamplers[0]->getOutput();
-  auto& upsampled_io = upsampledBuffer.getBuffer2(0);
+  auto& upsampledIo = upsampledBuffer.getBuffer2(0);
 
   // sidechain
 
@@ -374,48 +408,109 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
       envelopeInput, 2, numSamples);
   }
 
-  auto& upsampled_env_input =
+  auto& upsampledSideChainInput =
     oversampling.scalarToVecUpsamplers[1]->getOutput().getBuffer2(0);
 
   // processing
 
-  switch (topology) {
+  if (spline && !isBypassing) {
 
-    case Topology::Feedback:
+    switch (topology) {
 
-      feedbackProcess(upsampled_io, spline, automator, automationAlpha);
+      case Topology::Feedback:
 
-      break;
+        feedbackProcess(
+          upsampledIo, spline, automator, upsampledAutomationAlpha);
 
-    case Topology::Forward:
+        break;
 
-      forwardProcess(upsampled_io, spline, automator, automationAlpha);
+      case Topology::Forward:
 
-      break;
+        forwardProcess(
+          upsampledIo, spline, automator, upsampledAutomationAlpha);
 
-    case Topology::SideChain:
+        break;
 
-      sidechainProcess(
-        upsampled_io, upsampled_env_input, spline, automator, automationAlpha);
+      case Topology::SideChain:
 
-      break;
+        sidechainProcess(upsampledIo,
+                         upsampledSideChainInput,
+                         spline,
+                         automator,
+                         upsampledAutomationAlpha);
 
-    case Topology::EmptySideChain:
-      break;
+        break;
 
-    default:
-      assert(false);
-      break;
+      case Topology::EmptySideChain:
+        break;
+
+      default:
+        assert(false);
+        break;
+    }
   }
 
-  // downsample
+  // downsampling
 
-  oversampling.vecToScalarDownsamplers[0]->processBlock(
-    upsampledBuffer, ioAudio, 2, numSamples);
+  oversampling.vecToVecDownsamplers[0]->processBlock(
+    upsampledBuffer, 2, numSamples);
 
-  // output gain
+  oversampling.vecToVecDownsamplers[1]->processBlock(
+    upsampledBuffer, 2, numSamples);
 
-  applyGain(ioAudio, outputGainTarget, outputGain, automationAlpha, numSamples);
+  // dry-wet and output gain
+
+  auto& wetOutput = oversampling.vecToVecDownsamplers[0]->getOutput();
+  auto& dryOutput = oversampling.vecToVecDownsamplers[1]->getOutput();
+
+  if (isWetPassNeeded) {
+
+    auto& dryBuffer = dryOutput.getBuffer2(0);
+    auto& wetBuffer = wetOutput.getBuffer2(0);
+
+    Vec2d alpha = automationAlpha;
+
+    Vec2d amount = Vec2d().load(wetAmount);
+    Vec2d amountTarget = Vec2d().load(wetAmountTarget);
+
+    Vec2d gain = Vec2d().load(outputGain);
+    Vec2d gainTarget = Vec2d().load(outputGainTarget);
+
+    for (int i = 0; i < numUpsampledSamples; ++i) {
+      amount = alpha * (amount - amountTarget) + amountTarget;
+      gain = alpha * (gain - gainTarget) + gainTarget;
+      Vec2d wet = gain * wetBuffer[i];
+      Vec2d dry = dryBuffer[i];
+      wetBuffer[i] = amount * (wet - dry) + dry;
+    }
+
+    amount.store(wetAmount);
+    gain.store(outputGain);
+  }
+  else {
+    if (!isBypassing) {
+
+      auto& wetBuffer = wetOutput.getBuffer2(0);
+
+      Vec2d alpha = automationAlpha;
+      Vec2d gain = Vec2d().load(outputGain);
+      Vec2d gainTarget = Vec2d().load(outputGainTarget);
+
+      for (int i = 0; i < numUpsampledSamples; ++i) {
+        gain = alpha * (gain - gainTarget) + gainTarget;
+        wetBuffer[i] = gain * wetBuffer[i];
+      }
+
+      gain.store(outputGain);
+    }
+  }
+
+  if (isBypassing) {
+    dryOutput.deinterleave(ioAudio, 2, numSamples);
+  }
+  else {
+    wetOutput.deinterleave(ioAudio, 2, numSamples);
+  }
 
   // mid side
 
