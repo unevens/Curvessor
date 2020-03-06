@@ -112,7 +112,7 @@ CurvessorAudioProcessor::forwardProcess(
     SPILINE_AUTOMATION(spline, automator, numKnots, Vec2d);
 
     Vec2d env_out;
-    COMPUTE_GAMMAENV(envelopeFollower, Vec2d, in, env_out);
+    COMPUTE_GAMMAENV(envelopeFollower, Vec2d, in, env_out, true);
 
     env_out = applyStereoLink(
       env_out, stereo_link, stereo_link_target, automation_alpha);
@@ -167,7 +167,7 @@ CurvessorAudioProcessor::feedbackProcess(
     SPILINE_AUTOMATION(spline, automator, numKnots, Vec2d);
 
     Vec2d env_out;
-    COMPUTE_GAMMAENV(envelopeFollower, Vec2d, env_in, env_out);
+    COMPUTE_GAMMAENV(envelopeFollower, Vec2d, env_in, env_out, true);
 
     env_out = applyStereoLink(
       env_out, stereo_link, stereo_link_target, automation_alpha);
@@ -223,7 +223,7 @@ CurvessorAudioProcessor::sidechainProcess(
 
     Vec2d env_in = sidechain[i];
     Vec2d env_out;
-    COMPUTE_GAMMAENV(envelopeFollower, Vec2d, env_in, env_out);
+    COMPUTE_GAMMAENV(envelopeFollower, Vec2d, env_in, env_out, true);
 
     env_out = applyStereoLink(
       env_out, stereo_link, stereo_link_target, automation_alpha);
