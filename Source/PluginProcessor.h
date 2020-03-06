@@ -72,11 +72,7 @@ class CurvessorAudioProcessor : public AudioProcessor
 
   std::unique_ptr<OversamplingAttachments> oversamplingAttachments;
 
-  // splines
-
   adsp::SplineHolder<Vec2d> splines;
-
-  // envelope followers
 
   aligned_ptr<adsp::GammaEnv<Vec2d>> envelopeFollower;
 
@@ -106,7 +102,7 @@ class CurvessorAudioProcessor : public AudioProcessor
   oversimple::OversamplingGetter<double>& oversamplingGetter;
   oversimple::AsyncOversampling::Awaiter oversamplingAwaiter;
 
-  // processing
+  // processing methods
 
   void forwardProcess(VecBuffer<Vec2d>& io,
                       adsp::SplineInterface<Vec2d>* spline,
