@@ -305,7 +305,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
     outputGainTarget[c] = exp(db_to_lin * parameters.outputGain.get(c)->get());
     inputGainTarget[c] = exp(db_to_lin * parameters.inputGain.get(c)->get());
 
-    wetAmount[c] = parameters.wet.get(c)->get();
+    wetAmountTarget[c] = 0.01 * parameters.wet.get(c)->get();
 
     envelopeFollowerSettings.setup(
       c,
@@ -354,29 +354,15 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   applyGain(ioAudio, inputGainTarget, inputGain, automationAlpha, numSamples);
 
-  // early return if no knots are active
-
-  if (!spline) {
-    // output gain
-
-    applyGain(
-      ioAudio, outputGainTarget, outputGain, automationAlpha, numSamples);
-
-    // mid side
-
-    if (isMidSideEnabled) {
-      midSideToLeftRight(ioAudio, numSamples);
-    }
-
-    return;
-  }
-
   // oversampling
 
   oversampling.prepareBuffers(numSamples); // extra safety measure
 
   int const numUpsampledSamples =
     oversampling.scalarToVecUpsamplers[0]->processBlock(ioAudio, 2, numSamples);
+
+  oversampling.scalarToVecUpsamplers[1]->processBlock(
+    dryBuffer.get(), 2, numSamples);
 
   if (numUpsampledSamples == 0) {
     for (auto i = 0; i < totalNumOutputChannels; ++i) {
@@ -387,13 +373,15 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   auto& upsampledBuffer = oversampling.scalarToVecUpsamplers[0]->getOutput();
   auto& upsampledIo = upsampledBuffer.getBuffer2(0);
+  auto& upsampledDryBuffer = oversampling.scalarToVecUpsamplers[1]->getOutput();
 
   // sidechain
 
-  if (isUsingSideChain) {
-    double* envelopeInput[2] = { buffer.getWritePointer(2),
-                                 buffer.getWritePointer(3) };
+  double* envelopeInput[2] = { buffer.getWritePointer(isUsingSideChain ? 2 : 0),
+                               buffer.getWritePointer(isUsingSideChain ? 3
+                                                                       : 1) };
 
+  if (isUsingSideChain) {
     if (isMidSideEnabled) {
       leftRightToMidSide(envelopeInput, numSamples);
     }
@@ -403,13 +391,13 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
               sidechainInputGain,
               automationAlpha,
               numSamples);
-
-    oversampling.scalarToVecUpsamplers[1]->processBlock(
-      envelopeInput, 2, numSamples);
   }
 
+  oversampling.scalarToVecUpsamplers[2]->processBlock(
+    envelopeInput, 2, numSamples);
+
   auto& upsampledSideChainInput =
-    oversampling.scalarToVecUpsamplers[1]->getOutput().getBuffer2(0);
+    oversampling.scalarToVecUpsamplers[2]->getOutput().getBuffer2(0);
 
   // processing
 
@@ -453,10 +441,10 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
   // downsampling
 
   oversampling.vecToVecDownsamplers[0]->processBlock(
-    upsampledBuffer, 2, numSamples);
+    upsampledBuffer, 2, numUpsampledSamples, numSamples);
 
   oversampling.vecToVecDownsamplers[1]->processBlock(
-    upsampledBuffer, 2, numSamples);
+    upsampledDryBuffer, 2, numUpsampledSamples, numSamples);
 
   // dry-wet and output gain
 
@@ -477,8 +465,8 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
     Vec2d gainTarget = Vec2d().load(outputGainTarget);
 
     for (int i = 0; i < numSamples; ++i) {
-      amount = alpha * (amount - amountTarget) + amountTarget;
-      gain = alpha * (gain - gainTarget) + gainTarget;
+      amount = alpha * (amountTarget - amount) + amountTarget;
+      gain = alpha * (gainTarget - gain) + gainTarget;
       Vec2d wet = gain * wetBuffer[i];
       Vec2d dry = dryBuffer[i];
       wetBuffer[i] = amount * (wet - dry) + dry;
@@ -497,7 +485,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
       Vec2d gainTarget = Vec2d().load(outputGainTarget);
 
       for (int i = 0; i < numSamples; ++i) {
-        gain = alpha * (gain - gainTarget) + gainTarget;
+        gain = alpha * (gainTarget - gain) + gainTarget;
         wetBuffer[i] = gain * wetBuffer[i];
       }
 

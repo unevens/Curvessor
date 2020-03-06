@@ -109,7 +109,7 @@ CurvessorAudioProcessor::Parameters::Parameters(
   envelopeFollower.metric =
     CreateLinkableChoiceParameters("Metric", { "Peak", "RMS" });
 
-  stereoLink = CreateFloatParameter("Stereo-Link", 50.0, 0.0, 500.0, 1.f);
+  stereoLink = CreateFloatParameter("Stereo-Link", 50.0, 0.0, 100.0, 1.f);
 
   auto const isKnotActive = [](int knotIndex) {
     return knotIndex >= 3 && knotIndex <= 6;
@@ -151,7 +151,7 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 
   , asyncOversampling([this] {
     auto oversampling = OversamplingSettings{};
-    oversampling.numScalarToVecUpsamplers = 2;
+    oversampling.numScalarToVecUpsamplers = 3;
     oversampling.numVecToVecDownsamplers = 2;
     oversampling.numChannels = 2;
     oversampling.updateLatency = [this](int latency) {
