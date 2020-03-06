@@ -476,7 +476,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
     Vec2d gain = Vec2d().load(outputGain);
     Vec2d gainTarget = Vec2d().load(outputGainTarget);
 
-    for (int i = 0; i < numUpsampledSamples; ++i) {
+    for (int i = 0; i < numSamples; ++i) {
       amount = alpha * (amount - amountTarget) + amountTarget;
       gain = alpha * (gain - gainTarget) + gainTarget;
       Vec2d wet = gain * wetBuffer[i];
@@ -496,7 +496,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
       Vec2d gain = Vec2d().load(outputGain);
       Vec2d gainTarget = Vec2d().load(outputGainTarget);
 
-      for (int i = 0; i < numUpsampledSamples; ++i) {
+      for (int i = 0; i < numSamples; ++i) {
         gain = alpha * (gain - gainTarget) + gainTarget;
         wetBuffer[i] = gain * wetBuffer[i];
       }
