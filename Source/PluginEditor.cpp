@@ -45,8 +45,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
   , vuMeter({ { &processor.gainVuMeterResults[0],
                 &processor.gainVuMeterResults[1] } },
-            36.f,
-            [](float x) { return std::pow(x, 1.f / 2.f); })
+            36.f)
 
   , inputGain(*p.getCurvessorParameters().apvts,
               "Input Gain",
