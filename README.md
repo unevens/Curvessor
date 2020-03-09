@@ -33,7 +33,9 @@ You'll need [Projucer](https://shop.juce.com/get-juce) to open the file `Curvess
 
 Curvessor is developed and tested on Windows and Linux. It may also work on macOS, but I can neither confirm nor deny.
 
-VST and VST3 binaries are available at https://www.unevens.net/curvessor.html.
+VST binaries are available at https://www.unevens.net/curvessor.html.
+
+You can also build Curvessor as a VST3 plugin, but there it has an issue with Ableton Live when reporting the latency during the plugin initialization, which can lead the a crash. The branch `vst3-latency-workaround` offers a work in progress fix for that, but for now I suggest to use the VST version.
 
 ## Submodules, libraries, credits
 
