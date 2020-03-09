@@ -2,7 +2,7 @@
 
 <JUCERPROJECT id="cXxfk3" name="Curvessor" projectType="audioplug" jucerVersion="5.4.7"
               cppLanguageStandard="17" pluginFormats="buildAU,buildVST,buildVST3"
-              companyName="unevens" companyCopyright="Copyright Dario Mambro 2019"
+              companyName="unevens" companyCopyright="Copyright Dario Mambro 2020"
               companyWebsite="www.unevens.net" companyEmail="hi@unevens.net"
               headerPath="../../audio-dsp&#10;../../oversimple&#10;../../oversimple/avec&#10;../../oversimple/avec/vectorclass&#10;../../oversimple/r8brain&#10;../../juicy&#10;$(BOOST_INCLUDEDIR)&#10;"
               defines="R8B_PFFFT_DOUBLE=1&#10;NOMINMAX=1" pluginManufacturerCode="UnEv">
