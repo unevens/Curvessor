@@ -307,14 +307,25 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
     wetAmountTarget[c] = 0.01 * parameters.wet.get(c)->get();
 
-    envelopeFollowerSettings.setup(
-      c,
-      parameters.envelopeFollower.metric.get(c)->getIndex() == 1,
-      upsampledFrequencyCoef / parameters.envelopeFollower.attack.get(c)->get(),
+    // evenlope follower settings
+
+    bool const rms = parameters.envelopeFollower.metric.get(c)->getIndex() == 1;
+
+    double const attackFrequency =
+      parameters.envelopeFollower.attack.get(c)->get();
+
+    double const releaseFrequency =
       upsampledFrequencyCoef /
-        parameters.envelopeFollower.release.get(c)->get(),
-      parameters.envelopeFollower.attackDelay.get(c)->get(),
-      parameters.envelopeFollower.releaseDelay.get(c)->get());
+      parameters.envelopeFollower.release.get(c)->get();
+
+    double const attackDelay =
+      0.01 * parameters.envelopeFollower.attackDelay.get(c)->get();
+
+    double const releaseDelay =
+      0.01 * parameters.envelopeFollower.releaseDelay.get(c)->get();
+
+    envelopeFollowerSettings.setup(
+      c, rms, attackFrequency, releaseFrequency, attackDelay, releaseDelay);
   }
 
   if (automator) {
