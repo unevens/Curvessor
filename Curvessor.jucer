@@ -247,18 +247,6 @@
         <FILE id="YnB7SX" name="Upsampler2xSse.hpp" compile="0" resource="0"
               file="oversimple/hiir/Upsampler2xSse.hpp"/>
       </GROUP>
-      <GROUP id="{5DC88773-5420-B537-8F9A-2D334FAE696F}" name="lockfree">
-        <FILE id="N1zqAm" name="LockFreeAsync.hpp" compile="0" resource="0"
-              file="oversimple/lockfree-async/LockFreeAsync.hpp"/>
-        <FILE id="HiwdwX" name="LockFreeMessenger.hpp" compile="0" resource="0"
-              file="oversimple/lockfree-async/LockFreeMessenger.hpp"/>
-        <FILE id="jLcwIW" name="QwConfig.h" compile="0" resource="0" file="oversimple/lockfree-async/QwConfig.h"/>
-        <FILE id="B3Xv6L" name="QwLinkTraits.h" compile="0" resource="0" file="oversimple/lockfree-async/QwLinkTraits.h"/>
-        <FILE id="l2L3YJ" name="QwMpmcPopAllLifoStack.h" compile="0" resource="0"
-              file="oversimple/lockfree-async/QwMpmcPopAllLifoStack.h"/>
-      </GROUP>
-      <FILE id="LzGs2Y" name="AsyncOversampling.hpp" compile="0" resource="0"
-            file="oversimple/oversimple/AsyncOversampling.hpp"/>
       <FILE id="oxyaFI" name="Oversampling.hpp" compile="0" resource="0"
             file="oversimple/oversimple/Oversampling.hpp"/>
       <FILE id="BmREFq" name="FirOversampling.cpp" compile="1" resource="0"
