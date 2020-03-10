@@ -23,93 +23,90 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 CurvessorAudioProcessor::Parameters::Parameters(
   CurvessorAudioProcessor& processor)
 {
-  std::vector<std::unique_ptr<RangedAudioParameter>> parameters;
+  AudioProcessorValueTreeState::ParameterLayout layout;
 
-  auto const CreateFloatParameter =
+  auto const createFloatParameter =
     [&](String name, float value, float min, float max, float step = 0.01f) {
-      parameters.push_back(std::unique_ptr<RangedAudioParameter>(
-        new AudioParameterFloat(name, name, { min, max, step }, value)));
-
-      return static_cast<AudioParameterFloat*>(parameters.back().get());
+      auto p = new AudioParameterFloat(name, name, { min, max, step }, value);
+      layout.add(std::unique_ptr<RangedAudioParameter>(p));
+      return static_cast<AudioParameterFloat*>(p);
     };
 
   auto const createWrappedBoolParameter = [&](String name, float value) {
     WrappedBoolParameter wrapper;
-    parameters.push_back(wrapper.createParameter(name, value));
+    layout.add(wrapper.createParameter(name, value));
     return wrapper;
   };
 
-  auto const CreateBoolParameter = [&](String name, float value) {
-    parameters.push_back(std::unique_ptr<RangedAudioParameter>(
-      new AudioParameterBool(name, name, value)));
-
-    return static_cast<AudioParameterBool*>(parameters.back().get());
+  auto const createBoolParameter = [&](String name, float value) {
+    auto p = new AudioParameterBool(name, name, value);
+    layout.add(std::unique_ptr<RangedAudioParameter>(p));
+    return static_cast<AudioParameterBool*>(p);
   };
 
-  auto const CreateChoiceParameter =
+  auto const createChoiceParameter =
     [&](String name, StringArray choices, int defaultIndex = 0) {
-      parameters.push_back(std::unique_ptr<RangedAudioParameter>(
-        new AudioParameterChoice(name, name, choices, defaultIndex)));
-
-      return static_cast<AudioParameterChoice*>(parameters.back().get());
+      auto p = new AudioParameterChoice(name, name, choices, defaultIndex);
+      layout.add(std::unique_ptr<RangedAudioParameter>(p));
+      return static_cast<AudioParameterChoice*>(p);
     };
 
   String const ch0Suffix = "_ch0";
   String const ch1Suffix = "_ch1";
   String const linkSuffix = "_is_linked";
 
-  auto const CreateLinkableFloatParameters =
+  auto const createLinkableFloatParameters =
     [&](String name, float value, float min, float max, float step = 0.01f) {
       return LinkableParameter<AudioParameterFloat>{
         createWrappedBoolParameter(name + linkSuffix, true),
-        { CreateFloatParameter(name + ch0Suffix, value, min, max, step),
-          CreateFloatParameter(name + ch1Suffix, value, min, max, step) }
+        { createFloatParameter(name + ch0Suffix, value, min, max, step),
+          createFloatParameter(name + ch1Suffix, value, min, max, step) }
       };
     };
 
-  auto const CreateLinkableChoiceParameters =
+  auto const createLinkableChoiceParameters =
     [&](String name, StringArray choices, int defaultIndex = 0) {
       return LinkableParameter<AudioParameterChoice>{
         createWrappedBoolParameter(name + linkSuffix, true),
-        { CreateChoiceParameter(name + ch0Suffix, choices, defaultIndex),
-          CreateChoiceParameter(name + ch1Suffix, choices, defaultIndex) }
+        { createChoiceParameter(name + ch0Suffix, choices, defaultIndex),
+          createChoiceParameter(name + ch1Suffix, choices, defaultIndex) }
       };
     };
 
-  midSide = CreateBoolParameter("Mid-Side", false);
+  midSide = createBoolParameter("Mid-Side", false);
 
-  smoothingTime = CreateFloatParameter("Smoothing-Time", 50.0, 0.0, 500.0, 1.f);
+  smoothingTime = createFloatParameter("Smoothing-Time", 50.f, 0.f, 500.f, 1.f);
 
   topology =
-    CreateChoiceParameter("Topology", { "Forward", "Feedback", "SideChain" });
+    createChoiceParameter("Topology", { "Forward", "Feedback", "SideChain" });
 
-  oversampling = { static_cast<RangedAudioParameter*>(CreateChoiceParameter(
+  oversampling = { static_cast<RangedAudioParameter*>(createChoiceParameter(
                      "Oversampling", { "1x", "2x", "4x", "8x", "16x", "32x" })),
                    createWrappedBoolParameter("Linear-Phase-Oversampling",
                                               false) };
 
-  inputGain = CreateLinkableFloatParameters("Input-Gain", 0.0, -48.0, 48.0);
+  inputGain = createLinkableFloatParameters("Input-Gain", 0.f, -48.f, 48.f);
 
-  outputGain = CreateLinkableFloatParameters("Output-Gain", 0.0, -48.0, 48.0);
+  outputGain = createLinkableFloatParameters("Output-Gain", 0.f, -48.f, 48.f);
 
-  wet = CreateLinkableFloatParameters("Wet", 100.0, 0.0, 100.0, 1.0);
+  wet = createLinkableFloatParameters("Wet", 100.f, 0.f, 100.f, 1.f);
 
   envelopeFollower.attack =
-    CreateLinkableFloatParameters("Attack", 20.0, 0.1, 2000.0);
+    createLinkableFloatParameters("Attack", 20.f, 0.1f, 2000.f);
 
   envelopeFollower.release =
-    CreateLinkableFloatParameters("Release", 200.0, 1.0, 2000.0);
+    createLinkableFloatParameters("Release", 200.f, 1.f, 2000.f);
 
   envelopeFollower.attackDelay =
-    CreateLinkableFloatParameters("Attack-Delay", 0.0, 0.0, 25.0);
+    createLinkableFloatParameters("Attack-Delay", 0.f, 0.f, 25.f);
 
   envelopeFollower.releaseDelay =
-    CreateLinkableFloatParameters("Release-Delay", 0.0, 0.0, 25.0);
+    createLinkableFloatParameters("Release-Delay", 0.f, 0.f, 25.f);
 
   envelopeFollower.metric =
-    CreateLinkableChoiceParameters("Metric", { "Peak", "RMS" });
+    createLinkableChoiceParameters("Metric", { "Peak", "RMS" });
 
-  stereoLink = CreateFloatParameter("Stereo-Link", 50.0, 0.0, 100.0, 1.f);
+  stereoLink = createFloatParameter("Stereo-Link", 50.f, 0.f, 100.f, 1.f);
 
   auto const isKnotActive = [](int knotIndex) {
     return knotIndex >= 3 && knotIndex <= 6;
@@ -117,7 +114,7 @@ CurvessorAudioProcessor::Parameters::Parameters(
 
   spline = std::unique_ptr<SplineParameters>(
     new SplineParameters("",
-                         parameters,
+                         layout,
                          CurvessorAudioProcessor::maxEditableKnots,
                          { -96.f, 6.f, 0.01f },
                          { -96.f, 6.f, 0.01f },
@@ -126,10 +123,8 @@ CurvessorAudioProcessor::Parameters::Parameters(
                          { { -96.f, -96.f, 1.f, 1.f } }));
 
   apvts = std::unique_ptr<AudioProcessorValueTreeState>(
-    new AudioProcessorValueTreeState(processor,
-                                     nullptr,
-                                     "CURVESSOR-PARAMETERS",
-                                     { parameters.begin(), parameters.end() }));
+    new AudioProcessorValueTreeState(
+      processor, nullptr, "CURVESSOR-PARAMETERS", std::move(layout)));
 }
 
 CurvessorAudioProcessor::CurvessorAudioProcessor()
