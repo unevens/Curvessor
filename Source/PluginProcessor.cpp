@@ -174,15 +174,6 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
   gainVuMeterResults[0].store(0.f);
   gainVuMeterResults[1].store(0.f);
 
-  oversamplingSettings.numScalarToVecUpsamplers = 3;
-  oversamplingSettings.numVecToVecDownsamplers = 2;
-  oversamplingSettings.numChannels = 2;
-  oversamplingSettings.updateLatency = [this](int latency) {
-    setLatencySamples(latency);
-  };
-
-  oversampling = std::make_unique<Oversampling>(oversamplingSettings);
-
   looks.simpleFontSize *= uiGlobalScaleFactor;
   looks.simpleSliderLabelFontSize *= uiGlobalScaleFactor;
   looks.simpleRotarySliderOffset *= uiGlobalScaleFactor;
