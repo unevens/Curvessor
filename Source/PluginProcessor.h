@@ -26,7 +26,6 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 #include "SplineParameters.h"
 #include "adsp/GammaEnv.hpp"
 #include "adsp/Spline.hpp"
-#include "oversimple/AsyncOversampling.hpp"
 #include <JuceHeader.h>
 
 #ifndef CURVESSOR_UI_SCALE
@@ -71,8 +70,6 @@ class CurvessorAudioProcessor : public AudioProcessor
 
   Parameters parameters;
 
-  std::unique_ptr<OversamplingAttachments> oversamplingAttachments;
-
   adsp::SplineHolder<Vec2d> splines;
 
   aligned_ptr<adsp::GammaEnv<Vec2d>> envelopeFollower;
@@ -102,9 +99,11 @@ class CurvessorAudioProcessor : public AudioProcessor
   // oversampling
   using Oversampling = oversimple::Oversampling<double>;
   using OversamplingSettings = oversimple::OversamplingSettings;
-  oversimple::AsyncOversampling asyncOversampling;
-  oversimple::OversamplingGetter<double>& oversamplingGetter;
-  oversimple::AsyncOversampling::Awaiter oversamplingAwaiter;
+
+  OversamplingSettings oversamplingSettings;
+  std::unique_ptr<Oversampling> oversampling;
+  std::mutex oversamplingMutex;
+  OversamplingAttachments<double> oversamplingAttachments;
 
   // processing methods
 

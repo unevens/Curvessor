@@ -262,9 +262,6 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   // prepare to process
 
-  oversamplingGetter.update();
-  auto& oversampling = oversamplingGetter.get();
-
   bool const isMidSideEnabled = parameters.midSide->get();
 
   bool const isSideChainAvailable = totalNumOutputChannels == 4;
@@ -286,7 +283,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
   double const frequencyCoef =
     1000.0 * MathConstants<double>::twoPi / (getSampleRate());
 
-  double const upsampledFrequencyCoef = frequencyCoef / oversampling.getRate();
+  double const upsampledFrequencyCoef = frequencyCoef / oversampling->getRate();
 
   float const smoothingTime = parameters.smoothingTime->get();
 
@@ -367,12 +364,13 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   // oversampling
 
-  oversampling.prepareBuffers(numSamples); // extra safety measure
+  oversampling->prepareBuffers(numSamples); // extra safety measure
 
   int const numUpsampledSamples =
-    oversampling.scalarToVecUpsamplers[0]->processBlock(ioAudio, 2, numSamples);
+    oversampling->scalarToVecUpsamplers[0]->processBlock(
+      ioAudio, 2, numSamples);
 
-  oversampling.scalarToVecUpsamplers[1]->processBlock(
+  oversampling->scalarToVecUpsamplers[1]->processBlock(
     dryBuffer.get(), 2, numSamples);
 
   if (numUpsampledSamples == 0) {
@@ -382,9 +380,10 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
     return;
   }
 
-  auto& upsampledBuffer = oversampling.scalarToVecUpsamplers[0]->getOutput();
+  auto& upsampledBuffer = oversampling->scalarToVecUpsamplers[0]->getOutput();
   auto& upsampledIo = upsampledBuffer.getBuffer2(0);
-  auto& upsampledDryBuffer = oversampling.scalarToVecUpsamplers[1]->getOutput();
+  auto& upsampledDryBuffer =
+    oversampling->scalarToVecUpsamplers[1]->getOutput();
 
   // sidechain
 
@@ -404,11 +403,11 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
               numSamples);
   }
 
-  oversampling.scalarToVecUpsamplers[2]->processBlock(
+  oversampling->scalarToVecUpsamplers[2]->processBlock(
     envelopeInput, 2, numSamples);
 
   auto& upsampledSideChainInput =
-    oversampling.scalarToVecUpsamplers[2]->getOutput().getBuffer2(0);
+    oversampling->scalarToVecUpsamplers[2]->getOutput().getBuffer2(0);
 
   // processing
 
@@ -451,16 +450,16 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   // downsampling
 
-  oversampling.vecToVecDownsamplers[0]->processBlock(
+  oversampling->vecToVecDownsamplers[0]->processBlock(
     upsampledBuffer, 2, numUpsampledSamples, numSamples);
 
-  oversampling.vecToVecDownsamplers[1]->processBlock(
+  oversampling->vecToVecDownsamplers[1]->processBlock(
     upsampledDryBuffer, 2, numUpsampledSamples, numSamples);
 
   // dry-wet and output gain
 
-  auto& wetOutput = oversampling.vecToVecDownsamplers[0]->getOutput();
-  auto& dryOutput = oversampling.vecToVecDownsamplers[1]->getOutput();
+  auto& wetOutput = oversampling->vecToVecDownsamplers[0]->getOutput();
+  auto& dryOutput = oversampling->vecToVecDownsamplers[1]->getOutput();
 
   if (isWetPassNeeded) {
 

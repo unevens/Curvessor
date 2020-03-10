@@ -149,54 +149,63 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 
   , envelopeFollowerSettings(*envelopeFollower)
 
-  , asyncOversampling([this] {
-    auto oversampling = OversamplingSettings{};
-    oversampling.numScalarToVecUpsamplers = 3;
-    oversampling.numVecToVecDownsamplers = 2;
-    oversampling.numChannels = 2;
-    oversampling.updateLatency = [this](int latency) {
+  , oversamplingSettings([this] {
+    auto oversamplingSettings = OversamplingSettings{};
+    oversamplingSettings.numScalarToVecUpsamplers = 3;
+    oversamplingSettings.numVecToVecDownsamplers = 2;
+    oversamplingSettings.numChannels = 2;
+    oversamplingSettings.updateLatency = [this](int latency) {
       setLatencySamples(latency);
     };
-    return oversampling;
+    return oversamplingSettings;
   }())
 
-  , oversamplingGetter(
-      *oversimple::requestOversamplingGetter<double>(asyncOversampling))
+  , oversampling(std::make_unique<Oversampling>(oversamplingSettings))
 
-  , oversamplingAwaiter(asyncOversampling.requestAwaiter())
-
+  , oversamplingAttachments(parameters.oversampling,
+                            *parameters.apvts,
+                            this,
+                            &oversampling,
+                            &oversamplingSettings,
+                            &oversamplingMutex)
 {
   levelVuMeterResults[0].store(-500.f);
   levelVuMeterResults[1].store(-500.f);
   gainVuMeterResults[0].store(0.f);
   gainVuMeterResults[1].store(0.f);
 
-  oversamplingAttachments = std::make_unique<OversamplingAttachments>(
-    *parameters.apvts, asyncOversampling, parameters.oversampling);
+  oversamplingSettings.numScalarToVecUpsamplers = 3;
+  oversamplingSettings.numVecToVecDownsamplers = 2;
+  oversamplingSettings.numChannels = 2;
+  oversamplingSettings.updateLatency = [this](int latency) {
+    setLatencySamples(latency);
+  };
+
+  oversampling = std::make_unique<Oversampling>(oversamplingSettings);
 
   looks.simpleFontSize *= uiGlobalScaleFactor;
   looks.simpleSliderLabelFontSize *= uiGlobalScaleFactor;
   looks.simpleRotarySliderOffset *= uiGlobalScaleFactor;
 
   LookAndFeel::setDefaultLookAndFeel(&looks);
-
-  asyncOversampling.startTimer();
 }
 
 void
 CurvessorAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-  asyncOversampling.submitMessage([=](OversamplingSettings& oversampling) {
-    oversampling.numSamplesPerBlock = samplesPerBlock;
-  });
+  {
+    const std::lock_guard<std::mutex> lock(oversamplingMutex);
+    if (oversamplingSettings.numSamplesPerBlock != samplesPerBlock) {
+      oversamplingSettings.numSamplesPerBlock = samplesPerBlock;
+      oversampling = std::make_unique<Oversampling>(oversamplingSettings);
+    }
+  }
 
   dryBuffer.setNumSamples(samplesPerBlock);
 
   floatToDouble = AudioBuffer<double>(4, samplesPerBlock);
 
   reset();
-
-  oversamplingAwaiter.await();
 }
 
 void
