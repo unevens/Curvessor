@@ -184,17 +184,15 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 void
 CurvessorAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 {
-  {
-    const std::lock_guard<std::mutex> lock(oversamplingMutex);
-    if (oversamplingSettings.numSamplesPerBlock != samplesPerBlock) {
-      oversamplingSettings.numSamplesPerBlock = samplesPerBlock;
-      oversampling = std::make_unique<Oversampling>(oversamplingSettings);
-    }
-  }
-
   dryBuffer.setNumSamples(samplesPerBlock);
 
   floatToDouble = AudioBuffer<double>(4, samplesPerBlock);
+
+  if (oversamplingSettings.numSamplesPerBlock != samplesPerBlock) {
+    const std::lock_guard<std::mutex> lock(oversamplingMutex);
+    oversamplingSettings.numSamplesPerBlock = samplesPerBlock;
+    oversampling = std::make_unique<Oversampling>(oversamplingSettings);
+  }
 
   reset();
 }
