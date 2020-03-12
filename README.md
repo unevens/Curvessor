@@ -6,7 +6,7 @@
 
 Curvessor can be used as a classic compressor/expander, enjoying the freedom and precision that comes with spline editing.
 
-But more specifically, as it allows the authoring of response curves _that are not increasing_, Curvessor is meant be used for sound design.
+But more specifically, as it allows the authoring of response curves _that are not increasing_, Curvessor can be used for creative dynamic processing in sound design.
 
 ## Features
 
