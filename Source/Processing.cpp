@@ -83,6 +83,7 @@ toVumeter(__m128d vumeter_state, __m128d env, __m128d alpha)
 
 constexpr double ln10 = 2.30258509299404568402;
 constexpr double db_to_lin = ln10 / 20.0;
+
 void
 CurvessorAudioProcessor::Dsp::forwardProcess(VecBuffer<Vec2d>& io,
                                              int const numActiveKnots,
