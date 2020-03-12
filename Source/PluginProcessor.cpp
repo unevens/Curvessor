@@ -140,7 +140,7 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 
   , envelopeFollower(Aligned<adsp::GammaEnv<Vec2d>>::make())
 
-  , splines(adsp::SplineHolder<Vec2d>::make<maxNumKnots>(true))
+  , spline(avec::Aligned<Spline>::make())
 
   , envelopeFollowerSettings(*envelopeFollower)
 
@@ -197,8 +197,8 @@ CurvessorAudioProcessor::reset()
 {
   envelopeFollower->reset();
 
-  parameters.spline->updateSpline(splines);
-  splines.reset();
+  parameters.spline->updateSpline(*spline);
+  spline->reset();
 
   levelVuMeterBuffer[0] = -200.0;
   gainVuMeterBuffer[0] = 0.f;

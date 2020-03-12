@@ -41,6 +41,10 @@ constexpr static long double operator"" _p(long double px)
 
 class CurvessorAudioProcessor : public AudioProcessor
 {
+public:
+  static constexpr int maxNumKnots = 9;
+  static constexpr int maxEditableKnots = maxNumKnots - 1;
+
   enum class Topology
   {
     Forward,
@@ -49,6 +53,7 @@ class CurvessorAudioProcessor : public AudioProcessor
     EmptySideChain,
   };
 
+private:
   struct Parameters
   {
     AudioParameterBool* midSide;
@@ -70,7 +75,9 @@ class CurvessorAudioProcessor : public AudioProcessor
 
   Parameters parameters;
 
-  adsp::SplineHolder<Vec2d> splines;
+  using Spline = adsp::AutoSpline<Vec2d, maxNumKnots>;
+
+  aligned_ptr<Spline> spline;
 
   aligned_ptr<adsp::GammaEnv<Vec2d>> envelopeFollower;
 
@@ -108,25 +115,19 @@ class CurvessorAudioProcessor : public AudioProcessor
   // processing methods
 
   void forwardProcess(VecBuffer<Vec2d>& io,
-                      adsp::SplineInterface<Vec2d>* spline,
-                      adsp::SplineAutomatorInterface<Vec2d>* automator,
+                      int const numActiveKnots,
                       double const automationAlpha);
 
   void feedbackProcess(VecBuffer<Vec2d>& io,
-                       adsp::SplineInterface<Vec2d>* spline,
-                       adsp::SplineAutomatorInterface<Vec2d>* automator,
+                       int const numActiveKnots,
                        double const automationAlpha);
 
   void sidechainProcess(VecBuffer<Vec2d>& io,
                         VecBuffer<Vec2d>& sidechain,
-                        adsp::SplineInterface<Vec2d>* spline,
-                        adsp::SplineAutomatorInterface<Vec2d>* automator,
+                        int const numActiveKnots,
                         double const automationAlpha);
 
 public:
-  static constexpr int maxNumKnots = 9;
-  static constexpr int maxEditableKnots = maxNumKnots - 1;
-
   // for gui
 
   SimpleLookAndFeel looks;
