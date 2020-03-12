@@ -75,28 +75,51 @@ private:
 
   Parameters parameters;
 
-  using Spline = adsp::AutoSpline<Vec2d, maxNumKnots>;
+  struct Dsp
+  {
+    adsp::AutoSpline<Vec2d, maxNumKnots> autoSpline;
 
-  aligned_ptr<Spline> spline;
+    adsp::GammaEnv<Vec2d> envelopeFollower;
 
-  aligned_ptr<adsp::GammaEnv<Vec2d>> envelopeFollower;
+    double stereoLink[2];
+    double wetAmount[2];
+    double inputGain[2];
+    double outputGain[2];
+    double sidechainInputGain[2];
+    double feedbackBuffer[2];
+    double levelVuMeterBuffer[2];
+    double gainVuMeterBuffer[2];
+
+    Dsp()
+    {
+      AVEC_ASSERT_ALIGNMENT(this, Vec2d);
+      std::fill_n(stereoLink, 2 * 8, 0.0);
+    }
+
+    void reset(Parameters& parameters);
+
+    void forwardProcess(VecBuffer<Vec2d>& io,
+                        int const numActiveKnots,
+                        double const automationAlpha,
+                        double const stereoLinkTarget);
+
+    void feedbackProcess(VecBuffer<Vec2d>& io,
+                         int const numActiveKnots,
+                         double const automationAlpha,
+                         double const stereoLinkTarget);
+
+    void sidechainProcess(VecBuffer<Vec2d>& io,
+                          VecBuffer<Vec2d>& sidechain,
+                          int const numActiveKnots,
+                          double const automationAlpha,
+                          double const stereoLinkTarget);
+  };
+
+  aligned_ptr<Dsp> dsp;
 
   adsp::GammaEnvSettings<Vec2d> envelopeFollowerSettings;
 
-  VecBuffer<Vec2d> feedbackBuffer{ 1 };
-
   double smoothingTime = 100.0;
-
-  VecBuffer<Vec2d> stereoLink{ 1 };
-  VecBuffer<Vec2d> stereoLinkTarget{ 1 };
-
-  VecBuffer<Vec2d> levelVuMeterBuffer{ 1 };
-  VecBuffer<Vec2d> gainVuMeterBuffer{ 1 };
-
-  double inputGain[2] = { 1.0, 1.0 };
-  double sidechainInputGain[2] = { 1.0, 1.0 };
-  double outputGain[2] = { 1.0, 1.0 };
-  double wetAmount[2] = { 1.0, 1.0 };
 
   ScalarBuffer<double> dryBuffer{ 2 };
 
@@ -111,21 +134,6 @@ private:
   std::unique_ptr<Oversampling> oversampling;
   std::recursive_mutex oversamplingMutex;
   OversamplingAttachments<double, std::recursive_mutex> oversamplingAttachments;
-
-  // processing methods
-
-  void forwardProcess(VecBuffer<Vec2d>& io,
-                      int const numActiveKnots,
-                      double const automationAlpha);
-
-  void feedbackProcess(VecBuffer<Vec2d>& io,
-                       int const numActiveKnots,
-                       double const automationAlpha);
-
-  void sidechainProcess(VecBuffer<Vec2d>& io,
-                        VecBuffer<Vec2d>& sidechain,
-                        int const numActiveKnots,
-                        double const automationAlpha);
 
 public:
   // for gui
@@ -146,7 +154,7 @@ public:
   //==============================================================================
   void prepareToPlay(double sampleRate, int samplesPerBlock) override;
   void releaseResources() override;
-  void reset() override;
+  void reset() override { dsp->reset(parameters); }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
   bool isBusesLayoutSupported(const BusesLayout& layouts) const override;

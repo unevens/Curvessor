@@ -83,23 +83,23 @@ toVumeter(__m128d vumeter_state, __m128d env, __m128d alpha)
 
 constexpr double ln10 = 2.30258509299404568402;
 constexpr double db_to_lin = ln10 / 20.0;
-
 void
-CurvessorAudioProcessor::forwardProcess(VecBuffer<Vec2d>& io,
-                                        int const numActiveKnots,
-                                        double const automationAlpha)
+CurvessorAudioProcessor::Dsp::forwardProcess(VecBuffer<Vec2d>& io,
+                                             int const numActiveKnots,
+                                             double const automationAlpha,
+                                             double const stereoLinkTarget)
 {
-  auto& spl = spline->spline;
-  auto& splineAutomation = *spline;
-  LOAD_SPLINE_STATE(spl, numActiveKnots, Vec2d, maxNumKnots);
-  LOAD_SPLINE_AUTOMATION(splineAutomation, numActiveKnots, Vec2d, maxNumKnots);
+  auto& spline = autoSpline.spline;
+  LOAD_SPLINE_STATE(spline, numActiveKnots, Vec2d, maxNumKnots);
+  LOAD_SPLINE_AUTOMATION(autoSpline, numActiveKnots, Vec2d, maxNumKnots);
   LOAD_GAMMAENV_STATE(envelopeFollower, Vec2d);
 
-  __m128d stereo_link = _mm_load_pd(stereoLink[0]);
-  __m128d stereo_link_target = _mm_load_pd(stereoLinkTarget[0]);
-  __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer[0]);
-  __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer[0]);
+  __m128d stereo_link_target = _mm_set1_pd(stereoLinkTarget);
   __m128d automation_alpha = _mm_set1_pd(automationAlpha);
+
+  __m128d stereo_link = _mm_load_pd(stereoLink);
+  __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer);
+  __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer);
 
   int const numSamples = io.getNumSamples();
 
@@ -107,7 +107,7 @@ CurvessorAudioProcessor::forwardProcess(VecBuffer<Vec2d>& io,
 
     Vec2d in = io[i];
 
-    SPILINE_AUTOMATION(spl, splineAutomation, numActiveKnots, Vec2d);
+    SPILINE_AUTOMATION(spline, autoSpline, numActiveKnots, Vec2d);
 
     Vec2d env_out;
     COMPUTE_GAMMAENV(envelopeFollower, Vec2d, in, env_out, true);
@@ -118,7 +118,7 @@ CurvessorAudioProcessor::forwardProcess(VecBuffer<Vec2d>& io,
     level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
     Vec2d gc;
-    COMPUTE_SPLINE(spl, numActiveKnots, Vec2d, env_out, gc);
+    COMPUTE_SPLINE(spline, numActiveKnots, Vec2d, env_out, gc);
     gc -= env_out;
 
     gain_vumeter = toVumeter(gain_vumeter, gc, automation_alpha);
@@ -128,29 +128,30 @@ CurvessorAudioProcessor::forwardProcess(VecBuffer<Vec2d>& io,
     io[i] = in * gc;
   }
 
-  STORE_SPLINE_STATE(spl, numActiveKnots);
+  STORE_SPLINE_STATE(spline, numActiveKnots);
   STORE_GAMMAENV_STATE(envelopeFollower, Vec2d);
-  stereoLink[0] = stereo_link;
-  gainVuMeterBuffer[0] = gain_vumeter;
-  levelVuMeterBuffer[0] = level_vumeter;
+  _mm_store_pd(stereoLink, stereo_link);
+  _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
+  _mm_store_pd(levelVuMeterBuffer, level_vumeter);
 }
 
 void
-CurvessorAudioProcessor::feedbackProcess(VecBuffer<Vec2d>& io,
-                                         int const numActiveKnots,
-                                         double const automationAlpha)
+CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
+                                              int const numActiveKnots,
+                                              double const automationAlpha,
+                                              double const stereoLinkTarget)
 {
-  auto& spl = spline->spline;
-  auto& splineAutomation = *spline;
-  LOAD_SPLINE_STATE(spl, numActiveKnots, Vec2d, maxNumKnots);
-  LOAD_SPLINE_AUTOMATION(splineAutomation, numActiveKnots, Vec2d, maxNumKnots);
+  auto& spline = autoSpline.spline;
+  LOAD_SPLINE_STATE(spline, numActiveKnots, Vec2d, maxNumKnots);
+  LOAD_SPLINE_AUTOMATION(autoSpline, numActiveKnots, Vec2d, maxNumKnots);
   LOAD_GAMMAENV_STATE(envelopeFollower, Vec2d);
 
-  __m128d stereo_link = _mm_load_pd(stereoLink[0]);
-  __m128d stereo_link_target = _mm_load_pd(stereoLinkTarget[0]);
-  __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer[0]);
-  __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer[0]);
+  __m128d stereo_link_target = _mm_set1_pd(stereoLinkTarget);
   __m128d automation_alpha = _mm_set1_pd(automationAlpha);
+
+  __m128d stereo_link = _mm_load_pd(stereoLink);
+  __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer);
+  __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer);
 
   Vec2d env_in = feedbackBuffer[0];
 
@@ -160,7 +161,7 @@ CurvessorAudioProcessor::feedbackProcess(VecBuffer<Vec2d>& io,
 
     Vec2d in = io[i];
 
-    SPILINE_AUTOMATION(spl, splineAutomation, numActiveKnots, Vec2d);
+    SPILINE_AUTOMATION(spline, autoSpline, numActiveKnots, Vec2d);
 
     Vec2d env_out;
     COMPUTE_GAMMAENV(envelopeFollower, Vec2d, env_in, env_out, true);
@@ -171,7 +172,7 @@ CurvessorAudioProcessor::feedbackProcess(VecBuffer<Vec2d>& io,
     level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
     Vec2d gc;
-    COMPUTE_SPLINE(spl, numActiveKnots, Vec2d, env_out, gc);
+    COMPUTE_SPLINE(spline, numActiveKnots, Vec2d, env_out, gc);
     gc -= env_out;
 
     gain_vumeter = toVumeter(gain_vumeter, gc, automation_alpha);
@@ -181,39 +182,40 @@ CurvessorAudioProcessor::feedbackProcess(VecBuffer<Vec2d>& io,
     io[i] = env_in = in * gc;
   }
 
-  feedbackBuffer[0] = env_in;
+  _mm_store_pd(feedbackBuffer, env_in);
 
-  STORE_SPLINE_STATE(spl, numActiveKnots);
+  STORE_SPLINE_STATE(spline, numActiveKnots);
   STORE_GAMMAENV_STATE(envelopeFollower, Vec2d);
-  stereoLink[0] = stereo_link;
-  gainVuMeterBuffer[0] = gain_vumeter;
-  levelVuMeterBuffer[0] = level_vumeter;
+  _mm_store_pd(stereoLink, stereo_link);
+  _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
+  _mm_store_pd(levelVuMeterBuffer, level_vumeter);
 }
 
 void
-CurvessorAudioProcessor::sidechainProcess(VecBuffer<Vec2d>& io,
-                                          VecBuffer<Vec2d>& sidechain,
-                                          int const numActiveKnots,
-                                          double const automationAlpha)
+CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
+                                               VecBuffer<Vec2d>& sidechain,
+                                               int const numActiveKnots,
+                                               double const automationAlpha,
+                                               double const stereoLinkTarget)
 {
-  auto& spl = spline->spline;
-  auto& splineAutomation = *spline;
-  LOAD_SPLINE_STATE(spl, numActiveKnots, Vec2d, maxNumKnots);
-  LOAD_SPLINE_AUTOMATION(splineAutomation, numActiveKnots, Vec2d, maxNumKnots);
+  auto& spline = autoSpline.spline;
+  LOAD_SPLINE_STATE(spline, numActiveKnots, Vec2d, maxNumKnots);
+  LOAD_SPLINE_AUTOMATION(autoSpline, numActiveKnots, Vec2d, maxNumKnots);
   LOAD_GAMMAENV_STATE(envelopeFollower, Vec2d);
 
-  __m128d stereo_link = _mm_load_pd(stereoLink[0]);
-  __m128d stereo_link_target = _mm_load_pd(stereoLinkTarget[0]);
-  __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer[0]);
-  __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer[0]);
   __m128d automation_alpha = _mm_set1_pd(automationAlpha);
+  __m128d stereo_link_target = _mm_set1_pd(stereoLinkTarget);
+
+  __m128d stereo_link = _mm_load_pd(stereoLink);
+  __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer);
+  __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer);
 
   int const numSamples = io.getNumSamples();
 
   for (int i = 0; i < numSamples; ++i) {
     Vec2d in = io[i];
 
-    SPILINE_AUTOMATION(spl, splineAutomation, numActiveKnots, Vec2d);
+    SPILINE_AUTOMATION(spline, autoSpline, numActiveKnots, Vec2d);
 
     Vec2d env_in = sidechain[i];
     Vec2d env_out;
@@ -225,7 +227,7 @@ CurvessorAudioProcessor::sidechainProcess(VecBuffer<Vec2d>& io,
     level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
     Vec2d gc;
-    COMPUTE_SPLINE(spl, numActiveKnots, Vec2d, env_out, gc);
+    COMPUTE_SPLINE(spline, numActiveKnots, Vec2d, env_out, gc);
     gc -= env_out;
 
     gain_vumeter = toVumeter(gain_vumeter, gc, automation_alpha);
@@ -235,11 +237,11 @@ CurvessorAudioProcessor::sidechainProcess(VecBuffer<Vec2d>& io,
     io[i] = in * gc;
   }
 
-  STORE_SPLINE_STATE(spl, numActiveKnots);
+  STORE_SPLINE_STATE(spline, numActiveKnots);
   STORE_GAMMAENV_STATE(envelopeFollower, Vec2d);
-  stereoLink[0] = stereo_link;
-  gainVuMeterBuffer[0] = gain_vumeter;
-  levelVuMeterBuffer[0] = level_vumeter;
+  _mm_store_pd(stereoLink, stereo_link);
+  _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
+  _mm_store_pd(levelVuMeterBuffer, level_vumeter);
 }
 
 void
@@ -254,7 +256,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   double* ioAudio[2] = { buffer.getWritePointer(0), buffer.getWritePointer(1) };
 
-  // prepare to process
+  // update settings from parameters
 
   bool const isMidSideEnabled = parameters.midSide->get();
 
@@ -270,9 +272,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   bool const isUsingSideChain = topology == Topology::SideChain;
 
-  stereoLinkTarget[0] = 0.01 * parameters.stereoLink->get();
-
-  int numActiveKnots = parameters.spline->updateSpline(*spline);
+  double const stereoLinkTarget = 0.01 * parameters.stereoLink->get();
 
   double const frequencyCoef =
     1000.0 * MathConstants<double>::twoPi / (getSampleRate());
@@ -319,23 +319,27 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
       c, rms, attackFrequency, releaseFrequency, attackDelay, releaseDelay);
   }
 
-  spline->setSmoothingAlpha(upsampledAutomationAlpha);
+  dsp->autoSpline.setSmoothingAlpha(upsampledAutomationAlpha);
+
+  int numActiveKnots = parameters.spline->updateSpline(dsp->autoSpline);
 
   bool const isWetPassNeeded = [&] {
-    double m =
-      wetAmountTarget[0] * wetAmountTarget[1] * wetAmount[0] * wetAmount[1];
+    double m = wetAmountTarget[0] * wetAmountTarget[1] * dsp->wetAmount[0] *
+               dsp->wetAmount[1];
     if (m == 1.0) {
       return false;
     }
     if (m == 0.0) {
       return !(wetAmountTarget[0] == 0.0 && wetAmountTarget[1] == 0.0 &&
-               wetAmount[0] == 0.0 && wetAmount[1] == 0.0);
+               dsp->wetAmount[0] == 0.0 && dsp->wetAmount[1] == 0.0);
     }
     return true;
   }();
 
   bool const isBypassing =
-    (!isWetPassNeeded && (wetAmount[0] == 0.0)) || (numActiveKnots == 0);
+    (!isWetPassNeeded && (dsp->wetAmount[0] == 0.0)) || (numActiveKnots == 0);
+
+  // ready to process
 
   // mid side
 
@@ -353,7 +357,8 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   // input gain
 
-  applyGain(ioAudio, inputGainTarget, inputGain, automationAlpha, numSamples);
+  applyGain(
+    ioAudio, inputGainTarget, dsp->inputGain, automationAlpha, numSamples);
 
   // oversampling
 
@@ -391,7 +396,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
     applyGain(ioAudio,
               inputGainTarget,
-              sidechainInputGain,
+              dsp->sidechainInputGain,
               automationAlpha,
               numSamples);
   }
@@ -410,22 +415,29 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
       case Topology::Feedback:
 
-        feedbackProcess(upsampledIo, numActiveKnots, upsampledAutomationAlpha);
+        dsp->feedbackProcess(upsampledIo,
+                             numActiveKnots,
+                             upsampledAutomationAlpha,
+                             stereoLinkTarget);
 
         break;
 
       case Topology::Forward:
 
-        forwardProcess(upsampledIo, numActiveKnots, upsampledAutomationAlpha);
+        dsp->forwardProcess(upsampledIo,
+                            numActiveKnots,
+                            upsampledAutomationAlpha,
+                            stereoLinkTarget);
 
         break;
 
       case Topology::SideChain:
 
-        sidechainProcess(upsampledIo,
-                         upsampledSideChainInput,
-                         numActiveKnots,
-                         upsampledAutomationAlpha);
+        dsp->sidechainProcess(upsampledIo,
+                              upsampledSideChainInput,
+                              numActiveKnots,
+                              upsampledAutomationAlpha,
+                              stereoLinkTarget);
 
         break;
 
@@ -458,10 +470,10 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
     Vec2d alpha = automationAlpha;
 
-    Vec2d amount = Vec2d().load(wetAmount);
+    Vec2d amount = Vec2d().load_a(dsp->wetAmount);
     Vec2d amountTarget = Vec2d().load(wetAmountTarget);
 
-    Vec2d gain = Vec2d().load(outputGain);
+    Vec2d gain = Vec2d().load_a(dsp->outputGain);
     Vec2d gainTarget = Vec2d().load(outputGainTarget);
 
     for (int i = 0; i < numSamples; ++i) {
@@ -472,8 +484,8 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
       wetBuffer[i] = amount * (wet - dry) + dry;
     }
 
-    amount.store(wetAmount);
-    gain.store(outputGain);
+    amount.store(dsp->wetAmount);
+    gain.store(dsp->outputGain);
   }
   else {
     if (!isBypassing) {
@@ -481,7 +493,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
       auto& wetBuffer = wetOutput.getBuffer2(0);
 
       Vec2d alpha = automationAlpha;
-      Vec2d gain = Vec2d().load(outputGain);
+      Vec2d gain = Vec2d().load(dsp->outputGain);
       Vec2d gainTarget = Vec2d().load(outputGainTarget);
 
       for (int i = 0; i < numSamples; ++i) {
@@ -489,7 +501,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
         wetBuffer[i] = gain * wetBuffer[i];
       }
 
-      gain.store(outputGain);
+      gain.store(dsp->outputGain);
     }
   }
 
@@ -509,7 +521,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
   // update vu meters
 
   for (int i = 0; i < 2; ++i) {
-    levelVuMeterResults[i].store(levelVuMeterBuffer[0][i]);
-    gainVuMeterResults[i].store(gainVuMeterBuffer[0][i]);
+    levelVuMeterResults[i].store(dsp->levelVuMeterBuffer[i]);
+    gainVuMeterResults[i].store(dsp->gainVuMeterBuffer[i]);
   }
 }

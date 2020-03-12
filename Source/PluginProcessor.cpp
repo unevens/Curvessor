@@ -138,11 +138,9 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 
   , parameters(*this)
 
-  , envelopeFollower(Aligned<adsp::GammaEnv<Vec2d>>::make())
+  , dsp(Aligned<Dsp>::make())
 
-  , spline(avec::Aligned<Spline>::make())
-
-  , envelopeFollowerSettings(*envelopeFollower)
+  , envelopeFollowerSettings(dsp->envelopeFollower)
 
   , oversamplingSettings([this] {
     auto oversamplingSettings = OversamplingSettings{};
@@ -190,29 +188,6 @@ CurvessorAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
   }
 
   reset();
-}
-
-void
-CurvessorAudioProcessor::reset()
-{
-  envelopeFollower->reset();
-
-  parameters.spline->updateSpline(*spline);
-  spline->reset();
-
-  levelVuMeterBuffer[0] = -200.0;
-  gainVuMeterBuffer[0] = 0.f;
-  stereoLink[0] = stereoLinkTarget[0];
-
-  constexpr double ln10 = 2.30258509299404568402;
-  constexpr double db_to_lin = ln10 / 20.0;
-
-  for (int c = 0; c < 2; ++c) {
-    inputGain[c] = exp(db_to_lin * parameters.inputGain.get(c)->get());
-    outputGain[c] = exp(db_to_lin * parameters.outputGain.get(c)->get());
-    wetAmount[c] = 0.01 * parameters.wet.get(c)->get();
-    sidechainInputGain[c] = inputGain[c];
-  }
 }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -374,4 +349,28 @@ AudioProcessor* JUCE_CALLTYPE
 createPluginFilter()
 {
   return new CurvessorAudioProcessor();
+}
+
+void
+CurvessorAudioProcessor::Dsp::reset(Parameters& parameters)
+{
+  parameters.spline->updateSpline(autoSpline);
+
+  envelopeFollower.reset();
+  autoSpline.reset();
+
+  constexpr double ln10 = 2.30258509299404568402;
+  constexpr double db_to_lin = ln10 / 20.0;
+
+  double const stereoLinkTarget = 0.01 * parameters.stereoLink->get();
+
+  for (int c = 0; c < 2; ++c) {
+    gainVuMeterBuffer[c] = 0.f;
+    levelVuMeterBuffer[c] = -200.0;
+    stereoLink[c] = stereoLinkTarget;
+    inputGain[c] = exp(db_to_lin * parameters.inputGain.get(c)->get());
+    outputGain[c] = exp(db_to_lin * parameters.outputGain.get(c)->get());
+    wetAmount[c] = 0.01 * parameters.wet.get(c)->get();
+    sidechainInputGain[c] = inputGain[c];
+  }
 }
