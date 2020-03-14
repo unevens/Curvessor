@@ -119,8 +119,6 @@ private:
 
   adsp::GammaEnvSettings<Vec2d> envelopeFollowerSettings;
 
-  double smoothingTime = 100.0;
-
   ScalarBuffer<double> dryBuffer{ 2 };
 
   // buffer for single precision processing call

@@ -158,9 +158,9 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
 
   int const numSamples = io.getNumSamples();
 
-  for (int i = 0; i < numSamples; ++i) {
+  for (int s = 0; s < numSamples; ++s) {
 
-    Vec2d in = io[i];
+    Vec2d in = io[s];
 
     SPILINE_AUTOMATION(spline, autoSpline, numActiveKnots, Vec2d);
 
@@ -180,7 +180,7 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
 
     gc = exp(db_to_lin * gc);
 
-    io[i] = env_in = in * gc;
+    io[s] = env_in = in * gc;
   }
 
   _mm_store_pd(feedbackBuffer, env_in);
@@ -213,12 +213,12 @@ CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
 
   int const numSamples = io.getNumSamples();
 
-  for (int i = 0; i < numSamples; ++i) {
-    Vec2d in = io[i];
+  for (int s = 0; s < numSamples; ++s) {
+    Vec2d in = io[s];
 
     SPILINE_AUTOMATION(spline, autoSpline, numActiveKnots, Vec2d);
 
-    Vec2d env_in = sidechain[i];
+    Vec2d env_in = sidechain[s];
     Vec2d env_out;
     COMPUTE_GAMMAENV(envelopeFollower, Vec2d, env_in, env_out, true);
 
@@ -235,7 +235,7 @@ CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
 
     gc = exp(db_to_lin * gc);
 
-    io[i] = in * gc;
+    io[s] = in * gc;
   }
 
   STORE_SPLINE_STATE(spline, numActiveKnots);
@@ -522,7 +522,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
   // update vu meters
 
   for (int i = 0; i < 2; ++i) {
-    levelVuMeterResults[i].store(dsp->levelVuMeterBuffer[i]);
-    gainVuMeterResults[i].store(dsp->gainVuMeterBuffer[i]);
+    levelVuMeterResults[i].store((float)dsp->levelVuMeterBuffer[i]);
+    gainVuMeterResults[i].store((float)dsp->gainVuMeterBuffer[i]);
   }
 }

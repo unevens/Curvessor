@@ -32,13 +32,13 @@ CurvessorAudioProcessor::Parameters::Parameters(
       return static_cast<AudioParameterFloat*>(p);
     };
 
-  auto const createWrappedBoolParameter = [&](String name, float value) {
+  auto const createWrappedBoolParameter = [&](String name, bool value) {
     WrappedBoolParameter wrapper;
     layout.add(wrapper.createParameter(name, value));
     return wrapper;
   };
 
-  auto const createBoolParameter = [&](String name, float value) {
+  auto const createBoolParameter = [&](String name, bool value) {
     auto p = new AudioParameterBool(name, name, value);
     layout.add(std::unique_ptr<RangedAudioParameter>(p));
     return static_cast<AudioParameterBool*>(p);
