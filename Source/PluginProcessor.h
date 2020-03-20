@@ -75,9 +75,13 @@ private:
 
   Parameters parameters;
 
+  using Spline = adsp::Spline<Vec2d, maxNumKnots>;
+  using AutoSpline = adsp::AutoSpline<Vec2d, maxNumKnots>;
+  using SplineAutomator = adsp::Spline<Vec2d, maxNumKnots>::SmoothingAutomator;
+
   struct Dsp
   {
-    adsp::AutoSpline<Vec2d, maxNumKnots> autoSpline;
+    AutoSpline autoSpline;
 
     adsp::GammaEnv<Vec2d> envelopeFollower;
 
