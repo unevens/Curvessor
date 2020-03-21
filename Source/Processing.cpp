@@ -18,7 +18,6 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #include "PluginProcessor.h"
-#include "adsp/GammaEnvMacro.hpp"
 
 static void
 leftRightToMidSide(double** io, int const n)
@@ -89,10 +88,9 @@ CurvessorAudioProcessor::Dsp::forwardProcess(VecBuffer<Vec2d>& io,
                                              double const automationAlpha,
                                              double const stereoLinkTarget)
 {
-  auto spline = autoSpline.spline.getVecData<maxNumKnots>();
-  auto automation = autoSpline.automator.getVecData<maxNumKnots>();
-
-  LOAD_GAMMAENV_STATE(envelopeFollower, Vec2d);
+  auto spline = autoSpline.spline.getVecSpline<maxNumKnots>();
+  auto automation = autoSpline.automator.getVecAutomator<maxNumKnots>();
+  auto envelope = envelopeFollower.getVecData();
 
   __m128d stereo_link_target = _mm_set1_pd(stereoLinkTarget);
   __m128d automation_alpha = _mm_set1_pd(automationAlpha);
@@ -107,16 +105,15 @@ CurvessorAudioProcessor::Dsp::forwardProcess(VecBuffer<Vec2d>& io,
 
     Vec2d in = io[i];
 
-    Vec2d env_out;
-    COMPUTE_GAMMAENV(envelopeFollower, Vec2d, in, env_out, true);
+    Vec2d env_out = envelope.processDB(in);
 
     env_out = applyStereoLink(
       env_out, stereo_link, stereo_link_target, automation_alpha);
 
     level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
-    Vec2d gc = Spline::process<SplineAutomator::VecData>(
-      env_out, spline, automation, numActiveKnots);
+    Vec2d gc = spline.process<SplineAutomator::VecAutomator>(
+      env_out, automation, numActiveKnots);
 
     gc -= env_out;
 
@@ -128,7 +125,7 @@ CurvessorAudioProcessor::Dsp::forwardProcess(VecBuffer<Vec2d>& io,
   }
 
   autoSpline.spline.update(spline, numActiveKnots);
-  STORE_GAMMAENV_STATE(envelopeFollower, Vec2d);
+  envelope.update(envelopeFollower);
   _mm_store_pd(stereoLink, stereo_link);
   _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
   _mm_store_pd(levelVuMeterBuffer, level_vumeter);
@@ -140,10 +137,10 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
                                               double const automationAlpha,
                                               double const stereoLinkTarget)
 {
-  auto spline = autoSpline.spline.getVecData<maxNumKnots>();
-  auto automation = autoSpline.automator.getVecData<maxNumKnots>();
+  auto spline = autoSpline.spline.getVecSpline<maxNumKnots>();
+  auto automation = autoSpline.automator.getVecAutomator<maxNumKnots>();
 
-  LOAD_GAMMAENV_STATE(envelopeFollower, Vec2d);
+  auto envelope = envelopeFollower.getVecData();
 
   __m128d stereo_link_target = _mm_set1_pd(stereoLinkTarget);
   __m128d automation_alpha = _mm_set1_pd(automationAlpha);
@@ -160,16 +157,15 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
 
     Vec2d in = io[s];
 
-    Vec2d env_out;
-    COMPUTE_GAMMAENV(envelopeFollower, Vec2d, env_in, env_out, true);
+    Vec2d env_out = envelope.processDB(env_in);
 
     env_out = applyStereoLink(
       env_out, stereo_link, stereo_link_target, automation_alpha);
 
     level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
-    Vec2d gc = Spline::process<SplineAutomator::VecData>(
-      env_out, spline, automation, numActiveKnots);
+    Vec2d gc = spline.process<SplineAutomator::VecAutomator>(
+      env_out, automation, numActiveKnots);
 
     gc -= env_out;
 
@@ -183,7 +179,7 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
   _mm_store_pd(feedbackBuffer, env_in);
 
   autoSpline.spline.update(spline, numActiveKnots);
-  STORE_GAMMAENV_STATE(envelopeFollower, Vec2d);
+  envelope.update(envelopeFollower);
   _mm_store_pd(stereoLink, stereo_link);
   _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
   _mm_store_pd(levelVuMeterBuffer, level_vumeter);
@@ -196,10 +192,10 @@ CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
                                                double const automationAlpha,
                                                double const stereoLinkTarget)
 {
-  auto spline = autoSpline.spline.getVecData<maxNumKnots>();
-  auto automation = autoSpline.automator.getVecData<maxNumKnots>();
+  auto spline = autoSpline.spline.getVecSpline<maxNumKnots>();
+  auto automation = autoSpline.automator.getVecAutomator<maxNumKnots>();
 
-  LOAD_GAMMAENV_STATE(envelopeFollower, Vec2d);
+  auto envelope = envelopeFollower.getVecData();
 
   __m128d automation_alpha = _mm_set1_pd(automationAlpha);
   __m128d stereo_link_target = _mm_set1_pd(stereoLinkTarget);
@@ -214,16 +210,15 @@ CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
     Vec2d in = io[s];
 
     Vec2d env_in = sidechain[s];
-    Vec2d env_out;
-    COMPUTE_GAMMAENV(envelopeFollower, Vec2d, env_in, env_out, true);
+    Vec2d env_out = envelope.processDB(env_in);
 
     env_out = applyStereoLink(
       env_out, stereo_link, stereo_link_target, automation_alpha);
 
     level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
-    Vec2d gc = Spline::process<SplineAutomator::VecData>(
-      env_out, spline, automation, numActiveKnots);
+    Vec2d gc = spline.process<SplineAutomator::VecAutomator>(
+      env_out, automation, numActiveKnots);
 
     gc -= env_out;
 
@@ -235,7 +230,7 @@ CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
   }
 
   autoSpline.spline.update(spline, numActiveKnots);
-  STORE_GAMMAENV_STATE(envelopeFollower, Vec2d);
+  envelope.update(envelopeFollower);
   _mm_store_pd(stereoLink, stereo_link);
   _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
   _mm_store_pd(levelVuMeterBuffer, level_vumeter);

@@ -9,8 +9,6 @@
   <MAINGROUP id="Ayh0pr" name="Curvessor">
     <GROUP id="{215C9066-A75F-F5CA-873A-FAAC46F3DE3D}" name="audio-dsp">
       <FILE id="t4cMMj" name="GammaEnv.hpp" compile="0" resource="0" file="audio-dsp/adsp/GammaEnv.hpp"/>
-      <FILE id="b6kFYd" name="GammaEnvMacro.hpp" compile="0" resource="0"
-            file="audio-dsp/adsp/GammaEnvMacro.hpp"/>
       <FILE id="JsO0lR" name="Spline.hpp" compile="0" resource="0" file="audio-dsp/adsp/Spline.hpp"/>
     </GROUP>
     <GROUP id="{EB05EC87-04BF-C292-EA04-5ABBF5D410E0}" name="Images">
