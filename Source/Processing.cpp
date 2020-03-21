@@ -115,7 +115,7 @@ CurvessorAudioProcessor::Dsp::forwardProcess(VecBuffer<Vec2d>& io,
 
     level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
-    Vec2d gc = Spline::process<SplineAutomator::VecData<maxNumKnots>>(
+    Vec2d gc = Spline::process<SplineAutomator::VecData>(
       env_out, spline, automation, numActiveKnots);
 
     gc -= env_out;
@@ -168,7 +168,7 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
 
     level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
-    Vec2d gc = Spline::process<SplineAutomator::VecData<maxNumKnots>>(
+    Vec2d gc = Spline::process<SplineAutomator::VecData>(
       env_out, spline, automation, numActiveKnots);
 
     gc -= env_out;
@@ -222,7 +222,7 @@ CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
 
     level_vumeter = toVumeter(level_vumeter, env_out, automation_alpha);
 
-    Vec2d gc = Spline::process<SplineAutomator::VecData<maxNumKnots>>(
+    Vec2d gc = Spline::process<SplineAutomator::VecData>(
       env_out, spline, automation, numActiveKnots);
 
     gc -= env_out;
