@@ -213,23 +213,26 @@ void
 CurvessorAudioProcessor::processBlock(AudioBuffer<float>& buffer,
                                       MidiBuffer& midiMessages)
 {
-  auto totalNumInputChannels = getTotalNumInputChannels();
+  auto const totalNumInputChannels = getTotalNumInputChannels();
+  auto const numSamples = buffer.getNumSamples();
+
+  floatToDouble.setSize(totalNumInputChannels, numSamples, false, false, true);
 
   for (int c = 0; c < totalNumInputChannels; ++c) {
     std::copy(buffer.getReadPointer(c),
-              buffer.getReadPointer(c) + buffer.getNumSamples(),
+              buffer.getReadPointer(c) + numSamples,
               floatToDouble.getWritePointer(c));
   }
 
   for (int c = totalNumInputChannels; c < 4; ++c) {
-    floatToDouble.clear(c, 0, floatToDouble.getNumSamples());
+    floatToDouble.clear(c, 0, numSamples);
   }
 
   processBlock(floatToDouble, midiMessages);
 
   for (int c = 0; c < totalNumInputChannels; ++c) {
     std::copy(floatToDouble.getReadPointer(c),
-              floatToDouble.getReadPointer(c) + floatToDouble.getNumSamples(),
+              floatToDouble.getReadPointer(c) + numSamples,
               buffer.getWritePointer(c));
   }
 }
