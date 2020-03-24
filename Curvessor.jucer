@@ -6,7 +6,7 @@
               companyWebsite="www.unevens.net" companyEmail="hi@unevens.net"
               headerPath="../../audio-dsp&#10;../../oversimple&#10;../../oversimple/avec&#10;../../oversimple/avec/vectorclass&#10;../../oversimple/r8brain&#10;../../juicy&#10;$(BOOST_INCLUDEDIR)&#10;"
               defines="R8B_PFFFT_DOUBLE=1&#10;NOMINMAX=1" pluginManufacturerCode="UnEv"
-              version="1.1.1">
+              version="1.1.2">
   <MAINGROUP id="Ayh0pr" name="Curvessor">
     <GROUP id="{215C9066-A75F-F5CA-873A-FAAC46F3DE3D}" name="audio-dsp">
       <FILE id="t4cMMj" name="GammaEnv.hpp" compile="0" resource="0" file="audio-dsp/adsp/GammaEnv.hpp"/>
