@@ -216,7 +216,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<float>& buffer,
   auto const totalNumInputChannels = getTotalNumInputChannels();
   auto const numSamples = buffer.getNumSamples();
 
-  floatToDouble.setSize(totalNumInputChannels, numSamples, false, false, true);
+  floatToDouble.setSize(4, numSamples, false, false, true);
 
   for (int c = 0; c < totalNumInputChannels; ++c) {
     std::copy(buffer.getReadPointer(c),
