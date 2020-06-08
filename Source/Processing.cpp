@@ -149,7 +149,7 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
   __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer);
   __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer);
 
-  Vec2d env_in = feedbackBuffer[0];
+  Vec2d env_in = Vec2d().load(feedbackBuffer);
 
   int const numSamples = io.getNumSamples();
 
