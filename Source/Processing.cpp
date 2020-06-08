@@ -79,14 +79,22 @@ toVumeter(__m128d vumeter_state, __m128d env, __m128d alpha)
   return _mm_add_pd(env, _mm_mul_pd(alpha, _mm_sub_pd(vumeter_state, env)));
 }
 
+__m128d
+applyHighPassFilter(__m128d input, __m128d& state, __m128d g)
+{
+  __m128d v = _mm_mul_pd(g, _mm_sub_pd(input, state));
+  __m128d low = _mm_add_pd(v, state);
+  state = _mm_add_pd(low, v);
+  return _mm_sub_pd(input, low);
+}
+
 constexpr double ln10 = 2.30258509299404568402;
 constexpr double db_to_lin = ln10 / 20.0;
 
+template<int highPassOrder>
 void
 CurvessorAudioProcessor::Dsp::forwardProcess(VecBuffer<Vec2d>& io,
-                                             int const numActiveKnots,
-                                             double const automationAlpha,
-                                             double const stereoLinkTarget)
+                                             int const numActiveKnots)
 {
   auto spline = autoSpline.spline.getVecSpline<maxNumKnots>();
   auto automation = autoSpline.automator.getVecAutomator<maxNumKnots>();
@@ -99,13 +107,32 @@ CurvessorAudioProcessor::Dsp::forwardProcess(VecBuffer<Vec2d>& io,
   __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer);
   __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer);
 
+  __m128d high_pass_state = _mm_load_pd(highPassState);
+  __m128d high_pass_coef = _mm_load_pd(highPassCoef);
+  __m128d high_pass_state_2 = _mm_load_pd(highPassState2);
+  __m128d high_pass_state_3 = _mm_load_pd(highPassState3);
+
   int const numSamples = io.getNumSamples();
 
   for (int i = 0; i < numSamples; ++i) {
 
     Vec2d in = io[i];
 
-    Vec2d env_out = envelope.processDB(in);
+    Vec2d env_in = in;
+
+    if constexpr (highPassOrder >= 1) {
+      env_in = applyHighPassFilter(in, high_pass_state, high_pass_coef);
+    }
+
+    if constexpr (highPassOrder >= 2) {
+      env_in = applyHighPassFilter(env_in, high_pass_state_2, high_pass_coef);
+    }
+
+    if constexpr (highPassOrder >= 3) {
+      env_in = applyHighPassFilter(env_in, high_pass_state_3, high_pass_coef);
+    }
+
+    Vec2d env_out = envelope.processDB(env_in);
 
     env_out = applyStereoLink(
       env_out, stereo_link, stereo_link_target, automation_alpha);
@@ -129,13 +156,15 @@ CurvessorAudioProcessor::Dsp::forwardProcess(VecBuffer<Vec2d>& io,
   _mm_store_pd(stereoLink, stereo_link);
   _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
   _mm_store_pd(levelVuMeterBuffer, level_vumeter);
+  _mm_store_pd(highPassState, high_pass_state);
+  _mm_store_pd(highPassState2, high_pass_state_2);
+  _mm_store_pd(highPassState3, high_pass_state_3);
 }
 
+template<int highPassOrder>
 void
 CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
-                                              int const numActiveKnots,
-                                              double const automationAlpha,
-                                              double const stereoLinkTarget)
+                                              int const numActiveKnots)
 {
   auto spline = autoSpline.spline.getVecSpline<maxNumKnots>();
   auto automation = autoSpline.automator.getVecAutomator<maxNumKnots>();
@@ -149,13 +178,34 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
   __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer);
   __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer);
 
-  Vec2d env_in = Vec2d().load(feedbackBuffer);
+  __m128d feedback_amount_target = _mm_load_pd(feedbackAmountTarget);
+  __m128d feedback_amount = _mm_load_pd(feedbackAmount);
+  __m128d env_in = _mm_load_pd(feedbackBuffer);
+
+  __m128d high_pass_state = _mm_load_pd(highPassState);
+  __m128d high_pass_coef = _mm_load_pd(highPassCoef);
+  __m128d high_pass_state_2 = _mm_load_pd(highPassState2);
+  __m128d high_pass_state_3 = _mm_load_pd(highPassState3);
 
   int const numSamples = io.getNumSamples();
 
   for (int s = 0; s < numSamples; ++s) {
 
     Vec2d in = io[s];
+
+    feedback_amount =
+      feedback_amount +
+      automation_alpha * (feedback_amount_target - feedback_amount);
+
+    env_in = in + feedback_amount * (env_in - in);
+
+    if constexpr (highPassOrder >= 1) {
+      env_in = applyHighPassFilter(env_in, high_pass_state, high_pass_coef);
+    }
+
+    if constexpr (highPassOrder >= 2) {
+      env_in = applyHighPassFilter(env_in, high_pass_state_2, high_pass_coef);
+    }
 
     Vec2d env_out = envelope.processDB(env_in);
 
@@ -176,21 +226,22 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
     io[s] = env_in = in * gc;
   }
 
-  _mm_store_pd(feedbackBuffer, env_in);
-
   autoSpline.spline.update(spline, numActiveKnots);
   envelope.update(envelopeFollower);
   _mm_store_pd(stereoLink, stereo_link);
   _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
   _mm_store_pd(levelVuMeterBuffer, level_vumeter);
+  _mm_store_pd(feedbackBuffer, env_in);
+  _mm_store_pd(feedbackAmount, feedback_amount);
+  _mm_store_pd(highPassState, high_pass_state);
+  _mm_store_pd(highPassState2, high_pass_state_2);
 }
 
+template<int highPassOrder>
 void
 CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
                                                VecBuffer<Vec2d>& sidechain,
-                                               int const numActiveKnots,
-                                               double const automationAlpha,
-                                               double const stereoLinkTarget)
+                                               int const numActiveKnots)
 {
   auto spline = autoSpline.spline.getVecSpline<maxNumKnots>();
   auto automation = autoSpline.automator.getVecAutomator<maxNumKnots>();
@@ -204,12 +255,30 @@ CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
   __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer);
   __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer);
 
+  __m128d high_pass_state = _mm_load_pd(highPassState);
+  __m128d high_pass_coef = _mm_load_pd(highPassCoef);
+  __m128d high_pass_state_2 = _mm_load_pd(highPassState2);
+  __m128d high_pass_state_3 = _mm_load_pd(highPassState3);
+
   int const numSamples = io.getNumSamples();
 
   for (int s = 0; s < numSamples; ++s) {
     Vec2d in = io[s];
 
     Vec2d env_in = sidechain[s];
+
+    if constexpr (highPassOrder >= 1) {
+      env_in = applyHighPassFilter(env_in, high_pass_state, high_pass_coef);
+    }
+
+    if constexpr (highPassOrder >= 2) {
+      env_in = applyHighPassFilter(env_in, high_pass_state_2, high_pass_coef);
+    }
+
+    if constexpr (highPassOrder >= 3) {
+      env_in = applyHighPassFilter(env_in, high_pass_state_3, high_pass_coef);
+    }
+
     Vec2d env_out = envelope.processDB(env_in);
 
     env_out = applyStereoLink(
@@ -234,6 +303,9 @@ CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
   _mm_store_pd(stereoLink, stereo_link);
   _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
   _mm_store_pd(levelVuMeterBuffer, level_vumeter);
+  _mm_store_pd(highPassState, high_pass_state);
+  _mm_store_pd(highPassState2, high_pass_state_2);
+  _mm_store_pd(highPassState3, high_pass_state_3);
 }
 
 void
@@ -254,30 +326,32 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   bool const isSideChainAvailable = totalNumOutputChannels == 4;
 
-  Topology topology = static_cast<Topology>(parameters.topology->getIndex());
+  bool const isSideChainRequested = parameters.sideChain->get();
 
-  bool const isSideChainRequested = topology == Topology::SideChain;
+  bool const isUsingSideChain = isSideChainRequested && isSideChainAvailable;
 
-  if (isSideChainRequested && !isSideChainAvailable) {
-    topology = Topology::EmptySideChain;
-  }
+  dsp->stereoLinkTarget = 0.01 * parameters.stereoLink->get();
 
-  bool const isUsingSideChain = topology == Topology::SideChain;
+  double const invUpsampledSampleRate =
+    1.0 / (getSampleRate() * oversampling->getRate());
 
-  double const stereoLinkTarget = 0.01 * parameters.stereoLink->get();
+  double const bltFrequencyCoef =
+    MathConstants<double>::pi * invUpsampledSampleRate;
 
-  double const frequencyCoef =
-    1000.0 * MathConstants<double>::twoPi / (getSampleRate());
-
-  double const upsampledFrequencyCoef = frequencyCoef / oversampling->getRate();
+  double const upsampledAngularFrequencyCoef =
+    1000.0 * MathConstants<double>::twoPi * invUpsampledSampleRate;
 
   float const smoothingTime = parameters.smoothingTime->get();
 
   double const automationAlpha =
-    smoothingTime == 0.f ? 0.f : exp(-upsampledFrequencyCoef / smoothingTime);
+    smoothingTime == 0.f ? 0.f
+                         : exp(-upsampledAngularFrequencyCoef / smoothingTime);
 
   double const upsampledAutomationAlpha =
-    smoothingTime == 0.f ? 0.f : exp(-upsampledFrequencyCoef / smoothingTime);
+    smoothingTime == 0.f ? 0.f
+                         : exp(-upsampledAngularFrequencyCoef / smoothingTime);
+
+  dsp->automationAlpha = upsampledAutomationAlpha;
 
   double inputGainTarget[2];
   double outputGainTarget[2];
@@ -289,16 +363,27 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
     inputGainTarget[c] = exp(db_to_lin * parameters.inputGain.get(c)->get());
 
     wetAmountTarget[c] = 0.01 * parameters.wet.get(c)->get();
+    dsp->feedbackAmountTarget[c] =
+      0.01 * parameters.feedbackAmount.get(c)->get();
+
+    dsp->highPassCoef[c] = [&] {
+      double const g =
+        tan(bltFrequencyCoef * parameters.highPassCutoff.get(c)->get());
+      return g / (1.0 + g);
+    }();
 
     // evenlope follower settings
 
-    bool const rms = parameters.envelopeFollower.metric.get(c)->getIndex() == 1;
+    float const rmsTime = parameters.envelopeFollower.rmsTime.get(c)->get();
+
+    bool const rmsAlpha =
+      rmsTime == 0.f ? 0.f : exp(-upsampledAngularFrequencyCoef / rmsTime);
 
     double const attackFrequency =
       parameters.envelopeFollower.attack.get(c)->get();
 
     double const releaseFrequency =
-      upsampledFrequencyCoef /
+      upsampledAngularFrequencyCoef /
       parameters.envelopeFollower.release.get(c)->get();
 
     double const attackDelay =
@@ -307,8 +392,12 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
     double const releaseDelay =
       0.01 * parameters.envelopeFollower.releaseDelay.get(c)->get();
 
-    envelopeFollowerSettings.setup(
-      c, rms, attackFrequency, releaseFrequency, attackDelay, releaseDelay);
+    envelopeFollowerSettings.setup(c,
+                                   rmsAlpha,
+                                   attackFrequency,
+                                   releaseFrequency,
+                                   attackDelay,
+                                   releaseDelay);
   }
 
   dsp->autoSpline.automator.setSmoothingAlpha(upsampledAutomationAlpha);
@@ -330,6 +419,8 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   bool const isBypassing =
     (!isWetPassNeeded && (dsp->wetAmount[0] == 0.0)) || (numActiveKnots == 0);
+
+  int const highPassOrder = parameters.highPassOrder->getIndex();
 
   // ready to process
 
@@ -401,44 +492,81 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   // processing
 
+  const bool isFeedbackNeeded = [&] {
+    for (int c = 0; c < 2; ++c) {
+      if (dsp->feedbackAmountTarget[c] > 0.f) {
+        return true;
+      }
+      if (dsp->feedbackAmount[c] > 0.f) {
+        return true;
+      }
+    }
+    return false;
+  }();
+
   if (!isBypassing) {
-
-    switch (topology) {
-
-      case Topology::Feedback:
-
-        dsp->feedbackProcess(upsampledIo,
-                             numActiveKnots,
-                             upsampledAutomationAlpha,
-                             stereoLinkTarget);
-
-        break;
-
-      case Topology::Forward:
-
-        dsp->forwardProcess(upsampledIo,
-                            numActiveKnots,
-                            upsampledAutomationAlpha,
-                            stereoLinkTarget);
-
-        break;
-
-      case Topology::SideChain:
-
-        dsp->sidechainProcess(upsampledIo,
-                              upsampledSideChainInput,
-                              numActiveKnots,
-                              upsampledAutomationAlpha,
-                              stereoLinkTarget);
-
-        break;
-
-      case Topology::EmptySideChain:
-        break;
-
-      default:
-        assert(false);
-        break;
+    if (isSideChainRequested) {
+      if (isSideChainAvailable) {
+        switch (highPassOrder) {
+          case 0:
+            dsp->sidechainProcess<0>(
+              upsampledIo, upsampledSideChainInput, numActiveKnots);
+            break;
+          case 1:
+            dsp->sidechainProcess<1>(
+              upsampledIo, upsampledSideChainInput, numActiveKnots);
+            break;
+          case 2:
+            dsp->sidechainProcess<2>(
+              upsampledIo, upsampledSideChainInput, numActiveKnots);
+            break;
+          case 3:
+            dsp->sidechainProcess<3>(
+              upsampledIo, upsampledSideChainInput, numActiveKnots);
+            break;
+          default:
+            assert(false);
+            break;
+        }
+      }
+    }
+    else if (isFeedbackNeeded) {
+      switch (highPassOrder) {
+        case 0:
+          dsp->feedbackProcess<0>(upsampledIo, numActiveKnots);
+          break;
+        case 1:
+          dsp->feedbackProcess<1>(upsampledIo, numActiveKnots);
+          break;
+        case 2:
+          dsp->feedbackProcess<2>(upsampledIo, numActiveKnots);
+          break;
+        case 3:
+          dsp->feedbackProcess<3>(upsampledIo, numActiveKnots);
+          break;
+        default:
+          assert(false);
+          break;
+      }
+    }
+    else {
+      switch (highPassOrder) {
+        case 0:
+          dsp->forwardProcess<0>(upsampledIo, numActiveKnots);
+          break;
+        case 1:
+          dsp->forwardProcess<1>(upsampledIo, numActiveKnots);
+          break;
+        case 2:
+          dsp->forwardProcess<2>(upsampledIo, numActiveKnots);
+          break;
+        case 3:
+          dsp->forwardProcess<3>(upsampledIo, numActiveKnots);
+          break;
+        default:
+          assert(false);
+          break;
+      }
     }
   }
 

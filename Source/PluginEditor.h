@@ -42,8 +42,8 @@ private:
   GammaEnvEditor gammaEnv;
   GainVuMeter vuMeter;
   AttachedToggle midSide;
-  AttachedComboBox topology;
-  Label topologyLabel{ {}, "Topology" };
+  AttachedToggle sideChain;
+
   AttachedComboBox oversampling;
   AttachedToggle linearPhase;
   Label oversamplingLabel{ {}, "Oversampling" };
@@ -54,8 +54,13 @@ private:
   LinkableControl<AttachedSlider> inputGain;
   LinkableControl<AttachedSlider> outputGain;
   LinkableControl<AttachedSlider> wet;
-  ChannelLabels inputGainLabels;
-  ChannelLabels outputGainLabels;
+  LinkableControl<AttachedSlider> feedbackAmount;
+  LinkableControl<AttachedSlider> highPassCutoff;
+  AttachedComboBox highPassOrder;
+  ChannelLabels ioGainLabels;
+  ChannelLabels highPassCutoffLabels;
+  Label highPassLabelFirsLine{ {}, "Detector" };
+  Label highPassLabelSecondLine{ {}, "High Pass" };
   TextEditor url;
 
   Colour lineColour = Colours::white;

@@ -38,10 +38,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
   , midSide(*this, *p.getCurvessorParameters().apvts, "Mid-Side")
 
-  , topology(*this,
-             *p.getCurvessorParameters().apvts,
-             "Topology",
-             { "Forward", "Feedback", "SideChain" })
+  , sideChain(*this, *p.getCurvessorParameters().apvts, "Feedback-Amount")
 
   , vuMeter({ { &processor.gainVuMeterResults[0],
                 &processor.gainVuMeterResults[1] } },
@@ -59,11 +56,24 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
         "Wet",
         p.getCurvessorParameters().wet)
 
+  , feedbackAmount(*p.getCurvessorParameters().apvts,
+                   "Feedback",
+                   p.getCurvessorParameters().feedbackAmount)
+
+  , highPassCutoff(*p.getCurvessorParameters().apvts,
+                   "Cutoff",
+                   p.getCurvessorParameters().highPassCutoff)
+
+  , highPassOrder(*this,
+                  *p.getCurvessorParameters().apvts,
+                  "High-Pass-Order",
+                  { "Disabled", "6dB/Oct", "12db/Oct", "18dB/Oct" })
+
   , stereoLink(*this, *p.getCurvessorParameters().apvts, "Stereo-Link")
 
-  , inputGainLabels(*p.getCurvessorParameters().apvts, "Mid-Side")
+  , ioGainLabels(*p.getCurvessorParameters().apvts, "Mid-Side")
 
-  , outputGainLabels(*p.getCurvessorParameters().apvts, "Mid-Side")
+  , highPassCutoffLabels(*p.getCurvessorParameters().apvts, "Mid-Side")
 
   , oversampling(*this,
                  *p.getCurvessorParameters().apvts,
@@ -84,14 +94,17 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   addAndMakeVisible(inputGain);
   addAndMakeVisible(outputGain);
   addAndMakeVisible(wet);
+  addAndMakeVisible(feedbackAmount);
   addAndMakeVisible(gammaEnv);
   addAndMakeVisible(vuMeter);
-  addAndMakeVisible(topologyLabel);
   addAndMakeVisible(stereoLinkLabel);
   addAndMakeVisible(oversamplingLabel);
-  addAndMakeVisible(inputGainLabels);
-  addAndMakeVisible(outputGainLabels);
+  addAndMakeVisible(ioGainLabels);
+  addAndMakeVisible(highPassCutoffLabels);
   addAndMakeVisible(smoothingLabel);
+  addAndMakeVisible(highPassCutoff);
+  addAndMakeVisible(highPassLabelFirsLine);
+  addAndMakeVisible(highPassLabelSecondLine);
   addAndMakeVisible(url);
 
   spline.xSuffix = "dB";
@@ -99,20 +112,23 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
   attachAndInitializeSplineEditors(spline, selectedKnot, 3);
 
-  topologyLabel.setFont(Font(20._p, Font::bold));
   oversamplingLabel.setFont(Font(20._p, Font::bold));
   stereoLinkLabel.setFont(Font(20._p, Font::bold));
   midSide.getControl().setButtonText("Mid Side");
+  sideChain.getControl().setButtonText("SideChain");
 
-  topologyLabel.setJustificationType(Justification::centred);
   oversamplingLabel.setJustificationType(Justification::centred);
   stereoLinkLabel.setJustificationType(Justification::centred);
   smoothingLabel.setJustificationType(Justification::centred);
+  highPassLabelFirsLine.setJustificationType(Justification::centred);
+  highPassLabelSecondLine.setJustificationType(Justification::centred);
 
   smoothing.getControl().setTextValueSuffix("ms");
 
   for (int c = 0; c < 2; ++c) {
     spline.vuMeter[c] = &processor.levelVuMeterResults[c];
+    feedbackAmount.getControl(c).setTextValueSuffix("%");
+    highPassCutoff.getControl(c).setTextValueSuffix("hz");
   }
 
   linearPhase.getControl().setButtonText("Linear Phase");
@@ -135,14 +151,18 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   };
 
   applyTableSettings(inputGain);
-  applyTableSettings(inputGainLabels);
   applyTableSettings(outputGain);
-  applyTableSettings(outputGainLabels);
+  applyTableSettings(ioGainLabels);
+  applyTableSettings(highPassCutoffLabels);
+  applyTableSettings(feedbackAmount);
+  applyTableSettings(highPassCutoff);
   applyTableSettings(wet);
 
   for (int c = 0; c < 2; ++c) {
     outputGain.getControl(c).setTextValueSuffix("dB");
     inputGain.getControl(c).setTextValueSuffix("dB");
+    wet.getControl(c).setTextValueSuffix("%");
+    wet.getControl(c).setTextValueSuffix("%");
   }
 
   url.setFont({ 14._p, Font::bold });
@@ -160,37 +180,55 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   url.setText("www.unevens.net", dontSendNotification);
   url.setJustification(Justification::left);
 
-  setSize(885._p, 966._p);
+  setSize(1022._p, 966._p);
 }
 
 CurvessorAudioProcessorEditor::~CurvessorAudioProcessorEditor() {}
+
+constexpr auto offset = 10._p;
+constexpr auto rowHeight = 40._p;
+constexpr auto splineEditorSide = 572._p;
+constexpr auto vuMeterWidth = 89._p;
+constexpr auto knotEditorHeight = 160._p;
+constexpr auto gainLeft = 3 * offset + splineEditorSide + vuMeterWidth;
+constexpr auto ioGainTop = splineEditorSide + 2 * offset;
+constexpr auto highPassTop = splineEditorSide + offset - rowHeight * 4;
+constexpr auto offsetFromRight = 241._p;
+constexpr auto channelLabelsWidth = 55._p;
 
 void
 CurvessorAudioProcessorEditor::paint(Graphics& g)
 {
   g.drawImage(background, getLocalBounds().toFloat());
 
+  auto const left = getRight() - offsetFromRight - 5._p;
+
   g.setColour(backgroundColour);
-  g.fillRect(juce::Rectangle<float>(704._p, 10._p, 160._p, 400._p));
+  g.fillRect(juce::Rectangle<float>(left, 10._p, 160._p, 400._p));
+  g.fillRect(juce::Rectangle<float>(gainLeft, highPassTop, 136._p, 160._p));
 
   g.setColour(lineColour);
-  g.drawRect(704._p, 10._p, 160._p, 75._p, 1);
-  g.drawRect(704._p, 10._p, 160._p, 120._p, 1);
-  g.drawRect(704._p, 10._p, 160._p, 200._p, 1);
-  g.drawRect(704._p, 10._p, 160._p, 280._p, 1);
-  g.drawRect(704._p, 10._p, 160._p, 400._p, 1);
+
+  g.drawRect(left, 10._p, 160._p, 45._p, 1);
+  g.drawRect(left, 10._p, 160._p, 90._p, 1);
+  g.drawRect(left, 10._p, 160._p, 180._p, 1);
+  g.drawRect(left, 10._p, 160._p, 270._p, 1);
+  g.drawRect(left, 10._p, 160._p, 400._p, 1);
 
   g.drawRect(spline.getBounds().expanded(1, 1), 1);
+
+  g.drawRect(gainLeft, highPassTop, 136._p, 160._p, 1);
+  g.drawRect(gainLeft + 10._p, highPassTop + 10._p, 116._p, 60._p, 1);
+  g.drawLine(gainLeft + 30._p,
+             highPassTop + 80._p,
+             gainLeft + 106._p,
+             highPassTop + 80._p,
+             1);
 }
+
 void
 CurvessorAudioProcessorEditor::resized()
 {
-  constexpr auto offset = 10._p;
-  constexpr auto rowHeight = 40._p;
-  constexpr auto splineEditorSide = 572._p;
-  constexpr auto vuMeterWidth = 89._p;
-  constexpr auto knotEditorHeight = 160._p;
-
   spline.setTopLeftPosition(offset + 1, offset + 1);
   spline.setSize(splineEditorSide - 2, splineEditorSide - 2);
 
@@ -206,42 +244,54 @@ CurvessorAudioProcessorEditor::resized()
   gammaEnv.setTopLeftPosition(offset, gammaEnvEditorY);
   gammaEnv.setSize(gammaEnv.fullSizeWidth * uiGlobalScaleFactor, rowHeight * 4);
 
-  wet.setTopLeftPosition(gammaEnv.getRight() - 2, gammaEnvEditorY);
-  wet.setSize(140._p + 1, rowHeight * 4);
+  highPassLabelFirsLine.setTopLeftPosition(gainLeft, highPassTop + 10._p);
+  highPassLabelFirsLine.setSize(136._p, rowHeight);
 
-  constexpr auto gainLeft = 3 * offset + splineEditorSide + vuMeterWidth;
-  auto const outputGainTop = splineEditorSide + 2 * offset;
-  auto const inputGainTop = outputGainTop - offset - 4 * rowHeight;
+  highPassLabelSecondLine.setTopLeftPosition(gainLeft, highPassTop + 30._p);
+  highPassLabelSecondLine.setSize(136._p, rowHeight);
 
-  inputGainLabels.setTopLeftPosition(gainLeft, inputGainTop);
-  inputGainLabels.setSize(50._p, 160._p);
+  highPassOrder.getControl().setTopLeftPosition(gainLeft + 10._p,
+                                                highPassTop + 2.5 * rowHeight);
+  highPassOrder.getControl().setSize(116._p, rowHeight);
 
-  inputGain.setTopLeftPosition(gainLeft + 50._p - 1, inputGainTop);
-  inputGain.setSize(136._p, 160._p);
+  highPassCutoffLabels.setTopLeftPosition(gainLeft + 136._p - 2, highPassTop);
+  highPassCutoffLabels.setSize(channelLabelsWidth, rowHeight * 4);
 
-  outputGainLabels.setTopLeftPosition(gainLeft, outputGainTop);
-  outputGainLabels.setSize(50._p, 160._p);
+  highPassCutoff.setTopLeftPosition(highPassCutoffLabels.getRight() - 2,
+                                    highPassTop);
+  highPassCutoff.setSize(136._p, rowHeight * 4);
 
-  outputGain.setTopLeftPosition(gainLeft + 50._p - 1, outputGainTop);
-  outputGain.setSize(136._p, 160._p);
+  ioGainLabels.setTopLeftPosition(gainLeft, ioGainTop);
+  ioGainLabels.setSize(channelLabelsWidth, rowHeight * 4);
+
+  inputGain.setTopLeftPosition(gainLeft + channelLabelsWidth - 1, ioGainTop);
+  inputGain.setSize(136._p, rowHeight * 4);
+
+  outputGain.setTopLeftPosition(inputGain.getRight() - 2, ioGainTop);
+  outputGain.setSize(136._p, rowHeight * 4);
+
+  feedbackAmount.setTopLeftPosition(inputGain.getPosition().getX(),
+                                    gammaEnvEditorY);
+  feedbackAmount.setSize(136._p, rowHeight * 4);
+
+  wet.setTopLeftPosition(feedbackAmount.getRight() - 2, gammaEnvEditorY);
+  wet.setSize(136._p + 1, rowHeight * 4);
 
   Grid grid;
   using Track = Grid::TrackInfo;
 
-  grid.templateRows = { Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
-                        Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
-                        Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
-                        Track(Grid::Px(40._p)), Track(Grid::Px(40._p)),
-                        Track(Grid::Px(40._p)), Track(Grid::Px(40._p)) };
+  grid.templateRows = { Track(Grid::Px(44._p)), Track(Grid::Px(44._p)),
+                        Track(Grid::Px(44._p)), Track(Grid::Px(44._p)),
+                        Track(Grid::Px(44._p)), Track(Grid::Px(44._p)),
+                        Track(Grid::Px(48._p)), Track(Grid::Px(40._p)),
+                        Track(Grid::Px(40._p)) };
 
   grid.templateColumns = { Track(1_fr) };
 
   grid.items = {
-    GridItem(topologyLabel),
-    GridItem(topology.getControl())
+    GridItem(sideChain.getControl())
       .withWidth(120._p)
-      .withHeight(30._p)
-      .withAlignSelf(GridItem::AlignSelf::start)
+      .withAlignSelf(GridItem::AlignSelf::center)
       .withJustifySelf(GridItem::JustifySelf::center),
     GridItem(midSide.getControl())
       .withWidth(120._p)
@@ -276,11 +326,8 @@ CurvessorAudioProcessorEditor::resized()
   grid.justifyContent = Grid::JustifyContent::center;
   grid.alignContent = Grid::AlignContent::center;
 
-  grid.performLayout(
-    juce::Rectangle<int>(splineEditorSide + vuMeterWidth + 3 * offset + 17._p,
-                         offset - 2._p,
-                         150._p,
-                         400._p));
+  grid.performLayout(juce::Rectangle<int>(
+    getRight() - offsetFromRight, offset - 2._p, 150._p, 400._p));
 
   url.setTopLeftPosition(10._p, getHeight() - 18._p);
   url.setSize(160._p, 16._p);

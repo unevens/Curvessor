@@ -45,26 +45,22 @@ public:
   static constexpr int maxNumKnots = 9;
   static constexpr int maxEditableKnots = maxNumKnots - 1;
 
-  enum class Topology
-  {
-    Forward,
-    Feedback,
-    SideChain,
-    EmptySideChain,
-  };
-
 private:
   struct Parameters
   {
     AudioParameterBool* midSide;
-    AudioParameterChoice* topology;
+    AudioParameterBool* sideChain;
     LinkableParameter<AudioParameterFloat> inputGain;
     LinkableParameter<AudioParameterFloat> outputGain;
     LinkableParameter<AudioParameterFloat> wet;
+    LinkableParameter<AudioParameterFloat> feedbackAmount;
+    LinkableParameter<AudioParameterFloat> rmsTime;
     GammaEnvParameters envelopeFollower;
     AudioParameterFloat* stereoLink;
     AudioParameterFloat* smoothingTime;
     OversamplingParameters oversampling;
+    LinkableParameter<AudioParameterFloat> highPassCutoff;
+    AudioParameterChoice* highPassOrder;
 
     std::unique_ptr<SplineParameters> spline;
 
@@ -91,32 +87,38 @@ private:
     double outputGain[2];
     double sidechainInputGain[2];
     double feedbackBuffer[2];
+    double feedbackAmount[2];
+    double feedbackAmountTarget[2];
+    double rmsAlpha[2];
     double levelVuMeterBuffer[2];
     double gainVuMeterBuffer[2];
+    double highPassCoef[2];
+    double highPassState[2];
+    double highPassState2[2];
+    double highPassState3[2];
+    double automationAlpha;
+    double stereoLinkTarget;
 
     Dsp()
     {
       AVEC_ASSERT_ALIGNMENT(this, Vec2d);
-      std::fill_n(stereoLink, 2 * 8, 0.0);
+      std::fill_n(stereoLink, 2 * 15, 0.0);
     }
 
     void reset(Parameters& parameters);
 
+    template<int highPassOrder>
     void forwardProcess(VecBuffer<Vec2d>& io,
-                        int const numActiveKnots,
-                        double const automationAlpha,
-                        double const stereoLinkTarget);
+                        int const numActiveKnots);
 
+    template<int highPassOrder>
     void feedbackProcess(VecBuffer<Vec2d>& io,
-                         int const numActiveKnots,
-                         double const automationAlpha,
-                         double const stereoLinkTarget);
+                         int const numActiveKnots);
 
+    template<int highPassOrder>
     void sidechainProcess(VecBuffer<Vec2d>& io,
                           VecBuffer<Vec2d>& sidechain,
-                          int const numActiveKnots,
-                          double const automationAlpha,
-                          double const stereoLinkTarget);
+                          int const numActiveKnots);
   };
 
   aligned_ptr<Dsp> dsp;

@@ -334,16 +334,16 @@
  #define JucePlugin_Enable_IAA             0
 #endif
 #ifndef  JucePlugin_Name
- #define JucePlugin_Name                   "Curvessor"
+ #define JucePlugin_Name                   "Curvessor2"
 #endif
 #ifndef  JucePlugin_Desc
- #define JucePlugin_Desc                   "Curvessor"
+ #define JucePlugin_Desc                   "Curvessor2"
 #endif
 #ifndef  JucePlugin_Manufacturer
  #define JucePlugin_Manufacturer           "unevens"
 #endif
 #ifndef  JucePlugin_ManufacturerWebsite
- #define JucePlugin_ManufacturerWebsite    "www.unevens.net"
+ #define JucePlugin_ManufacturerWebsite    "https:://www.unevens.net"
 #endif
 #ifndef  JucePlugin_ManufacturerEmail
  #define JucePlugin_ManufacturerEmail      "hi@unevens.net"
@@ -352,7 +352,7 @@
  #define JucePlugin_ManufacturerCode       0x556e4576 // 'UnEv'
 #endif
 #ifndef  JucePlugin_PluginCode
- #define JucePlugin_PluginCode             0x43787866 // 'Cxxf'
+ #define JucePlugin_PluginCode             0x43727678 // 'Crvx'
 #endif
 #ifndef  JucePlugin_IsSynth
  #define JucePlugin_IsSynth                0
@@ -370,13 +370,13 @@
  #define JucePlugin_EditorRequiresKeyboardFocus  0
 #endif
 #ifndef  JucePlugin_Version
- #define JucePlugin_Version                1.1.5
+ #define JucePlugin_Version                2.0.0
 #endif
 #ifndef  JucePlugin_VersionCode
- #define JucePlugin_VersionCode            0x10105
+ #define JucePlugin_VersionCode            0x20000
 #endif
 #ifndef  JucePlugin_VersionString
- #define JucePlugin_VersionString          "1.1.5"
+ #define JucePlugin_VersionString          "2.0.0"
 #endif
 #ifndef  JucePlugin_VSTUniqueID
  #define JucePlugin_VSTUniqueID            JucePlugin_PluginCode
@@ -394,16 +394,16 @@
  #define JucePlugin_AUSubType              JucePlugin_PluginCode
 #endif
 #ifndef  JucePlugin_AUExportPrefix
- #define JucePlugin_AUExportPrefix         CurvessorAU
+ #define JucePlugin_AUExportPrefix         Curvessor2AU
 #endif
 #ifndef  JucePlugin_AUExportPrefixQuoted
- #define JucePlugin_AUExportPrefixQuoted   "CurvessorAU"
+ #define JucePlugin_AUExportPrefixQuoted   "Curvessor2AU"
 #endif
 #ifndef  JucePlugin_AUManufacturerCode
  #define JucePlugin_AUManufacturerCode     JucePlugin_ManufacturerCode
 #endif
 #ifndef  JucePlugin_CFBundleIdentifier
- #define JucePlugin_CFBundleIdentifier     com.unevens.Curvessor
+ #define JucePlugin_CFBundleIdentifier     com.unevens.Curvessor2
 #endif
 #ifndef  JucePlugin_RTASCategory
  #define JucePlugin_RTASCategory           0
@@ -421,7 +421,7 @@
  #define JucePlugin_RTASDisableMultiMono   0
 #endif
 #ifndef  JucePlugin_AAXIdentifier
- #define JucePlugin_AAXIdentifier          com.unevens.Curvessor
+ #define JucePlugin_AAXIdentifier          com.unevens.Curvessor2
 #endif
 #ifndef  JucePlugin_AAXManufacturerCode
  #define JucePlugin_AAXManufacturerCode    JucePlugin_ManufacturerCode
@@ -445,7 +445,7 @@
  #define JucePlugin_IAASubType             JucePlugin_PluginCode
 #endif
 #ifndef  JucePlugin_IAAName
- #define JucePlugin_IAAName                "unevens: Curvessor"
+ #define JucePlugin_IAAName                "unevens: Curvessor2"
 #endif
 #ifndef  JucePlugin_VSTNumMidiInputs
  #define JucePlugin_VSTNumMidiInputs       16

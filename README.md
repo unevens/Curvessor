@@ -1,4 +1,4 @@
-# Curvessor
+# Curvessor 2
 
 ![Curvessor GUI](Images/screenshot.jpg?raw=true 'screenshot')
 
@@ -12,7 +12,9 @@ But more specifically, as it allows the authoring of response curves _that are n
 
 - The response curves are smoothly automatable splines.
 - Optional Mid/Side Stereo processing.
-- Forward, Feedback and Sidechain topologies.
+- Forward, Feedback and Sidechain topologies. 
+- The amount of feedback can be smoothly changed, going from pure forward topology to pure feedback topology and everything in between. _(NEW in verison 2)_
+- Optional RMS and high-pass filtering on the level detector _(NEW in verison 2)_
 - All parameters, and all splines, can have different values on the Left channel and on the Right channel - or on the Mid channel and on the Side channel, when in Mid/Side Stero Mode.
 - Dry-Wet.
 - Up to 32x Oversampling with either Minimum Phase or Linear Phase Antialiasing.
@@ -47,3 +49,8 @@ VST and VST3 binaries are available at https://www.unevens.net/curvessor.html.
 Curvessor is released under the GNU GPLv3 license.
 
 VST is a trademark of Steinberg Media Technologies GmbH, registered in Europe and other countries.
+
+
+## Version 1
+
+For version 1, see the branch `version-1`.

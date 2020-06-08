@@ -25,12 +25,18 @@ CurvessorAudioProcessor::Parameters::Parameters(
 {
   AudioProcessorValueTreeState::ParameterLayout layout;
 
-  auto const createFloatParameter =
-    [&](String name, float value, float min, float max, float step = 0.01f) {
-      auto p = new AudioParameterFloat(name, name, { min, max, step }, value);
-      layout.add(std::unique_ptr<RangedAudioParameter>(p));
-      return static_cast<AudioParameterFloat*>(p);
-    };
+  auto const createFloatParameter = [&](String name,
+                                        float value,
+                                        float min,
+                                        float max,
+                                        float step = 0.01f,
+                                        float skewFactor = 1.f,
+                                        bool symmetricSkew = false) {
+    auto p = new AudioParameterFloat(
+      name, name, { min, max, step, skewFactor, symmetricSkew }, value);
+    layout.add(std::unique_ptr<RangedAudioParameter>(p));
+    return static_cast<AudioParameterFloat*>(p);
+  };
 
   auto const createWrappedBoolParameter = [&](String name, bool value) {
     WrappedBoolParameter wrapper;
@@ -55,14 +61,21 @@ CurvessorAudioProcessor::Parameters::Parameters(
   String const ch1Suffix = "_ch1";
   String const linkSuffix = "_is_linked";
 
-  auto const createLinkableFloatParameters =
-    [&](String name, float value, float min, float max, float step = 0.01f) {
-      return LinkableParameter<AudioParameterFloat>{
-        createWrappedBoolParameter(name + linkSuffix, true),
-        { createFloatParameter(name + ch0Suffix, value, min, max, step),
-          createFloatParameter(name + ch1Suffix, value, min, max, step) }
-      };
+  auto const createLinkableFloatParameters = [&](String name,
+                                                 float value,
+                                                 float min,
+                                                 float max,
+                                                 float step = 0.01f,
+                                                 float skewFactor = 1.f,
+                                                 bool symmetricSkew = false) {
+    return LinkableParameter<AudioParameterFloat>{
+      createWrappedBoolParameter(name + linkSuffix, true),
+      { createFloatParameter(
+          name + ch0Suffix, value, min, max, step, skewFactor, symmetricSkew),
+        createFloatParameter(
+          name + ch1Suffix, value, min, max, step, skewFactor, symmetricSkew) }
     };
+  };
 
   auto const createLinkableChoiceParameters =
     [&](String name, StringArray choices, int defaultIndex = 0) {
@@ -77,25 +90,29 @@ CurvessorAudioProcessor::Parameters::Parameters(
 
   smoothingTime = createFloatParameter("Smoothing-Time", 50.f, 0.f, 500.f, 1.f);
 
-  topology =
-    createChoiceParameter("Topology", { "Forward", "Feedback", "SideChain" });
+  sideChain = createBoolParameter("SideChain", false);
 
   oversampling = { static_cast<RangedAudioParameter*>(createChoiceParameter(
                      "Oversampling", { "1x", "2x", "4x", "8x", "16x", "32x" })),
                    createWrappedBoolParameter("Linear-Phase-Oversampling",
                                               false) };
 
-  inputGain = createLinkableFloatParameters("Input-Gain", 0.f, -48.f, 48.f);
+  inputGain = createLinkableFloatParameters(
+    "Input-Gain", 0.f, -48.f, 48.f, 0.01f, 0.25f, true);
 
-  outputGain = createLinkableFloatParameters("Output-Gain", 0.f, -48.f, 48.f);
+  outputGain = createLinkableFloatParameters(
+    "Output-Gain", 0.f, -48.f, 48.f, 0.01f, 0.25f, true);
 
   wet = createLinkableFloatParameters("Wet", 100.f, 0.f, 100.f, 1.f);
 
+  feedbackAmount =
+    createLinkableFloatParameters("Feedback-Amount", 0.f, 0.f, 100.f, 1.f);
+
   envelopeFollower.attack =
-    createLinkableFloatParameters("Attack", 20.f, 0.1f, 2000.f);
+    createLinkableFloatParameters("Attack", 20.f, 0.05f, 2000.f, 0.01f, 0.25f);
 
   envelopeFollower.release =
-    createLinkableFloatParameters("Release", 200.f, 1.f, 2000.f);
+    createLinkableFloatParameters("Release", 200.f, 1.f, 2000.f, 0.01f, 0.25f);
 
   envelopeFollower.attackDelay =
     createLinkableFloatParameters("Attack-Delay", 0.f, 0.f, 25.f);
@@ -103,10 +120,16 @@ CurvessorAudioProcessor::Parameters::Parameters(
   envelopeFollower.releaseDelay =
     createLinkableFloatParameters("Release-Delay", 0.f, 0.f, 25.f);
 
-  envelopeFollower.metric =
-    createLinkableChoiceParameters("Metric", { "Peak", "RMS" });
+  envelopeFollower.rmsTime =
+    createLinkableFloatParameters("RMS-Time", 0.f, 0.f, 1000.f, 0.01f, 0.25f);
 
   stereoLink = createFloatParameter("Stereo-Link", 50.f, 0.f, 100.f, 1.f);
+
+  highPassCutoff =
+    createLinkableFloatParameters("High-Pass-Cutoff", 100.f, 10.f, 250.f);
+
+  highPassOrder = createChoiceParameter(
+    "High-Pass-Order", { "Disabled", "6dB/Oct", "12db/Oct", "18dB/Oct" });
 
   auto const isKnotActive = [](int knotIndex) {
     return knotIndex >= 3 && knotIndex <= 6;
@@ -124,7 +147,7 @@ CurvessorAudioProcessor::Parameters::Parameters(
 
   apvts = std::unique_ptr<AudioProcessorValueTreeState>(
     new AudioProcessorValueTreeState(
-      processor, nullptr, "CURVESSOR-PARAMETERS", std::move(layout)));
+      processor, nullptr, "CURVESSOR2-PARAMETERS", std::move(layout)));
 }
 
 CurvessorAudioProcessor::CurvessorAudioProcessor()
@@ -375,5 +398,7 @@ CurvessorAudioProcessor::Dsp::reset(Parameters& parameters)
     outputGain[c] = exp(db_to_lin * parameters.outputGain.get(c)->get());
     wetAmount[c] = 0.01 * parameters.wet.get(c)->get();
     sidechainInputGain[c] = inputGain[c];
+    feedbackAmount[c] = feedbackAmountTarget[c] =
+      parameters.feedbackAmount.get(c)->get();
   }
 }
