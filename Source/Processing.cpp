@@ -324,7 +324,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   bool const isMidSideEnabled = parameters.midSide->get();
 
-  bool const isSideChainAvailable = totalNumOutputChannels == 4;
+  bool const isSideChainAvailable = totalNumInputChannels == 4;
 
   bool const isSideChainRequested = parameters.sideChain->get();
 
@@ -477,7 +477,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
       leftRightToMidSide(envelopeInput, numSamples);
     }
 
-    applyGain(ioAudio,
+    applyGain(envelopeInput,
               inputGainTarget,
               dsp->sidechainInputGain,
               automationAlpha,

@@ -38,7 +38,7 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
   , midSide(*this, *p.getCurvessorParameters().apvts, "Mid-Side")
 
-  , sideChain(*this, *p.getCurvessorParameters().apvts, "Feedback-Amount")
+  , sideChain(*this, *p.getCurvessorParameters().apvts, "SideChain")
 
   , vuMeter({ { &processor.gainVuMeterResults[0],
                 &processor.gainVuMeterResults[1] } },
