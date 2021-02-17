@@ -39,7 +39,7 @@ VST and VST3 binaries are available at https://www.unevens.net/curvessor.html.
 
 ## Submodules, libraries, credits
 
-- The [oversimple](https://github.com/unevens/hiir) submodule is a wrapper around two oversampling libraries:
+- The [oversimple](https://github.com/unevens/oversimple) submodule is a wrapper around two oversampling libraries:
     - [My fork of the HIIR](https://github.com/unevens/hiir) library by Laurent de Soras, *"a 2x Upsampler/Downsampler with two-path polyphase IIR anti-aliasing filtering"*. My fork adds support for double precision floating-point numbers, and AVX instructions.
     - [My fork](https://github.com/unevens/r8brain/tree/include)  of [r8brain-free-src](https://github.com/avaneev/r8brain-free-src), *"an high-quality pro
   audio sample rate converter / resampler C++ library"* by Aleksey Vaneev.
