@@ -5,8 +5,8 @@
               companyName="unevens" companyCopyright="Copyright Dario Mambro 2020"
               companyWebsite="https:://www.unevens.net" companyEmail="hi@unevens.net"
               headerPath="../../audio-dsp&#10;../../oversimple&#10;../../oversimple/avec&#10;../../oversimple/avec/vectorclass&#10;../../oversimple/r8brain&#10;../../juicy&#10;$(BOOST_INCLUDEDIR)&#10;"
-              defines="R8B_PFFFT_DOUBLE=1&#10;NOMINMAX=1" pluginManufacturerCode="UnEv"
-              version="2.0.1" pluginCode="Crvx">
+              defines="PFFFT_ENABLE_DOUBLE=1&#10;R8B_PFFFT_DOUBLE=1&#10;NOMINMAX=1"
+              pluginManufacturerCode="UnEv" version="2.0.1" pluginCode="Crvx">
   <MAINGROUP id="Ayh0pr" name="Curvessor2">
     <GROUP id="{215C9066-A75F-F5CA-873A-FAAC46F3DE3D}" name="audio-dsp">
       <FILE id="t4cMMj" name="GammaEnv.hpp" compile="0" resource="0" file="audio-dsp/adsp/GammaEnv.hpp"/>
@@ -44,30 +44,49 @@
     </GROUP>
     <GROUP id="{4FA82201-1342-51EC-0DEB-9DAE4DC926AC}" name="oversimple">
       <GROUP id="{14F6A89C-0E02-528C-111C-92760513FC1B}" name="r8brain">
-        <FILE id="IDQOEa" name="CDSPBlockConvolver.h" compile="0" resource="0"
+        <FILE id="SYCPw4" name="CDSPBlockConvolver.h" compile="0" resource="0"
               file="oversimple/r8brain/CDSPBlockConvolver.h"/>
-        <FILE id="ibIzs7" name="CDSPFIRFilter.h" compile="0" resource="0" file="oversimple/r8brain/CDSPFIRFilter.h"/>
-        <FILE id="mXtu2l" name="CDSPFracInterpolator.h" compile="0" resource="0"
+        <FILE id="VvmZLU" name="CDSPFIRFilter.h" compile="0" resource="0" file="oversimple/r8brain/CDSPFIRFilter.h"/>
+        <FILE id="M2PUsB" name="CDSPFracInterpolator.h" compile="0" resource="0"
               file="oversimple/r8brain/CDSPFracInterpolator.h"/>
-        <FILE id="v01ePp" name="CDSPHBDownsampler.h" compile="0" resource="0"
+        <FILE id="EOItM2" name="CDSPHBDownsampler.h" compile="0" resource="0"
               file="oversimple/r8brain/CDSPHBDownsampler.h"/>
-        <FILE id="DqAKBY" name="CDSPHBUpsampler.h" compile="0" resource="0"
+        <FILE id="MGz3Nv" name="CDSPHBUpsampler.h" compile="0" resource="0"
               file="oversimple/r8brain/CDSPHBUpsampler.h"/>
-        <FILE id="M1UWhr" name="CDSPProcessor.h" compile="0" resource="0" file="oversimple/r8brain/CDSPProcessor.h"/>
-        <FILE id="KA3QsL" name="CDSPRealFFT.h" compile="0" resource="0" file="oversimple/r8brain/CDSPRealFFT.h"/>
-        <FILE id="P0UMbL" name="CDSPResampler.h" compile="0" resource="0" file="oversimple/r8brain/CDSPResampler.h"/>
-        <FILE id="BtgeQR" name="CDSPSincFilterGen.h" compile="0" resource="0"
+        <FILE id="Redwx7" name="CDSPProcessor.h" compile="0" resource="0" file="oversimple/r8brain/CDSPProcessor.h"/>
+        <FILE id="oSP5Ls" name="CDSPRealFFT.h" compile="0" resource="0" file="oversimple/r8brain/CDSPRealFFT.h"/>
+        <FILE id="DQDFnU" name="CDSPResampler.h" compile="0" resource="0" file="oversimple/r8brain/CDSPResampler.h"/>
+        <FILE id="k2jWpu" name="CDSPSincFilterGen.h" compile="0" resource="0"
               file="oversimple/r8brain/CDSPSincFilterGen.h"/>
-        <FILE id="Hu0LCv" name="fft4g.h" compile="0" resource="0" file="oversimple/r8brain/fft4g.h"/>
-        <FILE id="HDr1Pa" name="pffft-double.cpp" compile="1" resource="0"
-              file="oversimple/r8brain/pffft-double.cpp"/>
-        <FILE id="oY73lW" name="pffft-double.h" compile="0" resource="0" file="oversimple/r8brain/pffft-double.h"/>
-        <FILE id="OeCHRa" name="pffft.cpp" compile="1" resource="0" file="oversimple/r8brain/pffft.cpp"/>
-        <FILE id="JRrfAR" name="pffft.h" compile="0" resource="0" file="oversimple/r8brain/pffft.h"/>
-        <FILE id="BrXPL2" name="r8bbase.cpp" compile="1" resource="0" file="oversimple/r8brain/r8bbase.cpp"/>
-        <FILE id="Vt6EY2" name="r8bbase.h" compile="0" resource="0" file="oversimple/r8brain/r8bbase.h"/>
-        <FILE id="Q4JZZe" name="r8bconf.h" compile="0" resource="0" file="oversimple/r8brain/r8bconf.h"/>
-        <FILE id="p27CiT" name="r8butil.h" compile="0" resource="0" file="oversimple/r8brain/r8butil.h"/>
+        <FILE id="NGpshE" name="fft4g.h" compile="0" resource="0" file="oversimple/r8brain/fft4g.h"/>
+        <FILE id="qGOuns" name="pf_avx_double.h" compile="0" resource="0" file="oversimple/r8brain/simd/pf_avx_double.h"/>
+        <FILE id="tw5uGN" name="pf_double.h" compile="0" resource="0" file="oversimple/r8brain/simd/pf_double.h"/>
+        <FILE id="MjQsil" name="pf_float.h" compile="0" resource="0" file="oversimple/r8brain/simd/pf_float.h"/>
+        <FILE id="mbgSf7" name="pf_neon_double.h" compile="0" resource="0"
+              file="oversimple/r8brain/simd/pf_neon_double.h"/>
+        <FILE id="QUPj6m" name="pf_neon_double_from_avx.h" compile="0" resource="0"
+              file="oversimple/r8brain/simd/pf_neon_double_from_avx.h"/>
+        <FILE id="D2MBDl" name="pf_neon_float.h" compile="0" resource="0" file="oversimple/r8brain/simd/pf_neon_float.h"/>
+        <FILE id="APq0y2" name="pf_scalar_double.h" compile="0" resource="0"
+              file="oversimple/r8brain/simd/pf_scalar_double.h"/>
+        <FILE id="hn3QwC" name="pf_scalar_float.h" compile="0" resource="0"
+              file="oversimple/r8brain/simd/pf_scalar_float.h"/>
+        <FILE id="QFf1f6" name="pf_sse1_float.h" compile="0" resource="0" file="oversimple/r8brain/simd/pf_sse1_float.h"/>
+        <FILE id="WFUJQy" name="pf_sse2_double.h" compile="0" resource="0"
+              file="oversimple/r8brain/simd/pf_sse2_double.h"/>
+        <FILE id="eufZJZ" name="pffft.cpp" compile="1" resource="0" file="oversimple/r8brain/pffft.cpp"/>
+        <FILE id="brQJdI" name="pffft.h" compile="0" resource="0" file="oversimple/r8brain/pffft.h"/>
+        <FILE id="N4CttT" name="pffft_common.cpp" compile="1" resource="0"
+              file="oversimple/r8brain/pffft_common.cpp"/>
+        <FILE id="eGN0yZ" name="pffft_double.cpp" compile="1" resource="0"
+              file="oversimple/r8brain/pffft_double.cpp"/>
+        <FILE id="sqH1xt" name="pffft_double.h" compile="0" resource="0" file="oversimple/r8brain/pffft_double.h"/>
+        <FILE id="XI5MLv" name="pffft_priv_impl.h" compile="0" resource="0"
+              file="oversimple/r8brain/pffft_priv_impl.h"/>
+        <FILE id="hbWvSD" name="r8bbase.cpp" compile="1" resource="0" file="oversimple/r8brain/r8bbase.cpp"/>
+        <FILE id="iR5epV" name="r8bbase.h" compile="0" resource="0" file="oversimple/r8brain/r8bbase.h"/>
+        <FILE id="JlOqpv" name="r8bconf.h" compile="0" resource="0" file="oversimple/r8brain/r8bconf.h"/>
+        <FILE id="KI83Mp" name="r8butil.h" compile="0" resource="0" file="oversimple/r8brain/r8butil.h"/>
       </GROUP>
       <GROUP id="{6AD72D82-253F-6771-1CD7-80CD51492194}" name="avec">
         <GROUP id="{17412750-A4A0-D636-61BF-639D10859B39}" name="vcl">
@@ -102,11 +121,19 @@
         </GROUP>
         <FILE id="Hr8aBw" name="Alignment.hpp" compile="0" resource="0" file="oversimple/avec/avec/Alignment.hpp"/>
         <FILE id="usEimR" name="Avec.hpp" compile="0" resource="0" file="oversimple/avec/avec/Avec.hpp"/>
+        <FILE id="Aymc1U" name="BoostAlign.hpp" compile="0" resource="0" file="oversimple/avec/avec/BoostAlign.hpp"/>
         <FILE id="dn1bKl" name="InterleavedBuffer.hpp" compile="0" resource="0"
               file="oversimple/avec/avec/InterleavedBuffer.hpp"/>
+        <FILE id="Rjz3eS" name="NeonMath.hpp" compile="0" resource="0" file="oversimple/avec/avec/NeonMath.hpp"/>
+        <FILE id="aHyCt0" name="NeonMathDouble.hpp" compile="0" resource="0"
+              file="oversimple/avec/avec/NeonMathDouble.hpp"/>
+        <FILE id="qxQD92" name="NeonMathFloat.hpp" compile="0" resource="0"
+              file="oversimple/avec/avec/NeonMathFloat.hpp"/>
+        <FILE id="iKflN8" name="NeonVec.hpp" compile="0" resource="0" file="oversimple/avec/avec/NeonVec.hpp"/>
         <FILE id="EgDjWq" name="ScalarBuffer.hpp" compile="0" resource="0"
               file="oversimple/avec/avec/ScalarBuffer.hpp"/>
         <FILE id="VRPsAC" name="Simd.hpp" compile="0" resource="0" file="oversimple/avec/avec/Simd.hpp"/>
+        <FILE id="I1gNxD" name="Traits.hpp" compile="0" resource="0" file="oversimple/avec/avec/Traits.hpp"/>
         <FILE id="h4TwJh" name="VecBuffer.hpp" compile="0" resource="0" file="oversimple/avec/avec/VecBuffer.hpp"/>
         <FILE id="GuzbDV" name="VecView.hpp" compile="0" resource="0" file="oversimple/avec/avec/VecView.hpp"/>
       </GROUP>
@@ -385,7 +412,7 @@
     </GROUP>
   </MAINGROUP>
   <EXPORTFORMATS>
-    <VS2019 targetFolder="Builds/VisualStudio2019" extraCompilerFlags="/arch:AVX">
+    <VS2019 targetFolder="Builds/VisualStudio2019">
       <CONFIGURATIONS>
         <CONFIGURATION isDebug="1" name="Debug"/>
         <CONFIGURATION isDebug="0" name="Release"/>

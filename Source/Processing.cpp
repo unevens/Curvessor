@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Dario Mambro
+Copyright 2020-2021 Dario Mambro
 
 This file is part of Curvessor.
 
@@ -56,36 +56,30 @@ applyGain(double** io,
   }
 }
 
-static inline __m128d
-applyStereoLink(__m128d in,
-                __m128d& stereo_link,
-                __m128d& stereo_link_target,
-                __m128d alpha)
+static inline Vec2d
+applyStereoLink(Vec2d in,
+                Vec2d& stereo_link,
+                Vec2d& stereo_link_target,
+                Vec2d alpha)
 {
-  __m128d mean =
-    _mm_mul_pd(_mm_set1_pd(0.5),
-               _mm_add_pd(in, _mm_shuffle_pd(in, in, _MM_SHUFFLE2(0, 1))));
-
-  stereo_link =
-    _mm_add_pd(stereo_link_target,
-               _mm_mul_pd(alpha, _mm_sub_pd(stereo_link, stereo_link_target)));
-
-  return _mm_add_pd(in, _mm_mul_pd(stereo_link, _mm_sub_pd(mean, in)));
+  auto const mean = 0.5 * (in + permute2<1, 0>(in));
+  stereo_link = stereo_link_target + alpha * (stereo_link - stereo_link_target);
+  return in + stereo_link * (mean - in);
 }
 
-__m128d
-toVumeter(__m128d vumeter_state, __m128d env, __m128d alpha)
+Vec2d
+toVumeter(Vec2d vumeter_state, Vec2d env, Vec2d alpha)
 {
-  return _mm_add_pd(env, _mm_mul_pd(alpha, _mm_sub_pd(vumeter_state, env)));
+  return env + alpha * (vumeter_state - env);
 }
 
-__m128d
-applyHighPassFilter(__m128d input, __m128d& state, __m128d g)
+Vec2d
+applyHighPassFilter(Vec2d input, Vec2d& state, Vec2d g)
 {
-  __m128d v = _mm_mul_pd(g, _mm_sub_pd(input, state));
-  __m128d low = _mm_add_pd(v, state);
-  state = _mm_add_pd(low, v);
-  return _mm_sub_pd(input, low);
+  auto const v = g * (input - state);
+  auto const low = v + state;
+  state = low + v;
+  return input - low;
 }
 
 constexpr double ln10 = 2.30258509299404568402;
@@ -100,17 +94,17 @@ CurvessorAudioProcessor::Dsp::forwardProcess(VecBuffer<Vec2d>& io,
   auto automation = autoSpline.automator.getVecAutomator<maxNumKnots>();
   auto envelope = envelopeFollower.getVecData();
 
-  __m128d stereo_link_target = _mm_set1_pd(stereoLinkTarget);
-  __m128d automation_alpha = _mm_set1_pd(automationAlpha);
+  auto stereo_link_target = Vec2d(stereoLinkTarget);
+  auto automation_alpha = Vec2d(automationAlpha);
 
-  __m128d stereo_link = _mm_load_pd(stereoLink);
-  __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer);
-  __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer);
+  auto stereo_link = Vec2d().load(stereoLink);
+  auto gain_vumeter = Vec2d().load(gainVuMeterBuffer);
+  auto level_vumeter = Vec2d().load(levelVuMeterBuffer);
 
-  __m128d high_pass_state = _mm_load_pd(highPassState);
-  __m128d high_pass_coef = _mm_load_pd(highPassCoef);
-  __m128d high_pass_state_2 = _mm_load_pd(highPassState2);
-  __m128d high_pass_state_3 = _mm_load_pd(highPassState3);
+  auto high_pass_state = Vec2d().load(highPassState);
+  auto high_pass_coef = Vec2d().load(highPassCoef);
+  auto high_pass_state_2 = Vec2d().load(highPassState2);
+  auto high_pass_state_3 = Vec2d().load(highPassState3);
 
   int const numSamples = io.getNumSamples();
 
@@ -171,21 +165,21 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
 
   auto envelope = envelopeFollower.getVecData();
 
-  __m128d stereo_link_target = _mm_set1_pd(stereoLinkTarget);
-  __m128d automation_alpha = _mm_set1_pd(automationAlpha);
+  auto stereo_link_target = Vec2d(stereoLinkTarget);
+  auto automation_alpha = Vec2d(automationAlpha);
 
-  __m128d stereo_link = _mm_load_pd(stereoLink);
-  __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer);
-  __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer);
+  auto stereo_link = Vec2d().load(stereoLink);
+  auto gain_vumeter = Vec2d().load(gainVuMeterBuffer);
+  auto level_vumeter = Vec2d().load(levelVuMeterBuffer);
 
-  __m128d feedback_amount_target = _mm_load_pd(feedbackAmountTarget);
-  __m128d feedback_amount = _mm_load_pd(feedbackAmount);
-  __m128d env_in = _mm_load_pd(feedbackBuffer);
+  auto feedback_amount_target = Vec2d().load(feedbackAmountTarget);
+  auto feedback_amount = Vec2d().load(feedbackAmount);
+  auto env_in = Vec2d().load(feedbackBuffer);
 
-  __m128d high_pass_state = _mm_load_pd(highPassState);
-  __m128d high_pass_coef = _mm_load_pd(highPassCoef);
-  __m128d high_pass_state_2 = _mm_load_pd(highPassState2);
-  __m128d high_pass_state_3 = _mm_load_pd(highPassState3);
+  auto high_pass_state = Vec2d().load(highPassState);
+  auto high_pass_coef = Vec2d().load(highPassCoef);
+  auto high_pass_state_2 = Vec2d().load(highPassState2);
+  auto high_pass_state_3 = Vec2d().load(highPassState3);
 
   int const numSamples = io.getNumSamples();
 
@@ -228,13 +222,14 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
 
   autoSpline.spline.update(spline, numActiveKnots);
   envelope.update(envelopeFollower);
-  _mm_store_pd(stereoLink, stereo_link);
-  _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
-  _mm_store_pd(levelVuMeterBuffer, level_vumeter);
-  _mm_store_pd(feedbackBuffer, env_in);
-  _mm_store_pd(feedbackAmount, feedback_amount);
-  _mm_store_pd(highPassState, high_pass_state);
-  _mm_store_pd(highPassState2, high_pass_state_2);
+
+  stereo_link.store(stereoLink);
+  gain_vumeter.store(gainVuMeterBuffer);
+  level_vumeter.store(levelVuMeterBuffer);
+  env_in.store(feedbackBuffer);
+  feedback_amount.store(feedbackAmount);
+  high_pass_state.store(highPassState);
+  high_pass_state_2.store(highPassState2);
 }
 
 template<int highPassOrder>
@@ -248,17 +243,17 @@ CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
 
   auto envelope = envelopeFollower.getVecData();
 
-  __m128d automation_alpha = _mm_set1_pd(automationAlpha);
-  __m128d stereo_link_target = _mm_set1_pd(stereoLinkTarget);
+  auto automation_alpha = Vec2d(automationAlpha);
+  auto stereo_link_target = Vec2d(stereoLinkTarget);
 
-  __m128d stereo_link = _mm_load_pd(stereoLink);
-  __m128d gain_vumeter = _mm_load_pd(gainVuMeterBuffer);
-  __m128d level_vumeter = _mm_load_pd(levelVuMeterBuffer);
+  auto stereo_link = Vec2d().load(stereoLink);
+  auto gain_vumeter = Vec2d().load(gainVuMeterBuffer);
+  auto level_vumeter = Vec2d().load(levelVuMeterBuffer);
 
-  __m128d high_pass_state = _mm_load_pd(highPassState);
-  __m128d high_pass_coef = _mm_load_pd(highPassCoef);
-  __m128d high_pass_state_2 = _mm_load_pd(highPassState2);
-  __m128d high_pass_state_3 = _mm_load_pd(highPassState3);
+  auto high_pass_state = Vec2d().load(highPassState);
+  auto high_pass_coef = Vec2d().load(highPassCoef);
+  auto high_pass_state_2 = Vec2d().load(highPassState2);
+  auto high_pass_state_3 = Vec2d().load(highPassState3);
 
   int const numSamples = io.getNumSamples();
 
@@ -300,12 +295,12 @@ CurvessorAudioProcessor::Dsp::sidechainProcess(VecBuffer<Vec2d>& io,
 
   autoSpline.spline.update(spline, numActiveKnots);
   envelope.update(envelopeFollower);
-  _mm_store_pd(stereoLink, stereo_link);
-  _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
-  _mm_store_pd(levelVuMeterBuffer, level_vumeter);
-  _mm_store_pd(highPassState, high_pass_state);
-  _mm_store_pd(highPassState2, high_pass_state_2);
-  _mm_store_pd(highPassState3, high_pass_state_3);
+  stereo_link.store(stereoLink);
+  gain_vumeter.store(gainVuMeterBuffer);
+  level_vumeter.store(levelVuMeterBuffer);
+  high_pass_state.store(highPassState);
+  high_pass_state_2.store(highPassState2);
+  high_pass_state_3.store(highPassState3);
 }
 
 void
