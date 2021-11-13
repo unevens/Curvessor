@@ -334,8 +334,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
   oversampling.dry->setOrder(oversamplingOrder);
   oversampling.sidechain->setOrder(oversamplingOrder);
 
-  auto const isUsingLinearPhase =
-    parameters.oversampling.linearPhase.getValue();
+  auto const isUsingLinearPhase = parameters.oversampling.linearPhase.getValue();
 
   oversampling.signal->setOrder(oversamplingOrder);
   oversampling.dry->setOrder(oversamplingOrder);

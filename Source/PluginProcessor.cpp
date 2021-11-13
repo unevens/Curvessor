@@ -169,8 +169,7 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
     oversimple::OversamplingSettings signalSettings;
     signalSettings.numDownSampledChannels = 2;
     signalSettings.numDownSampledChannels = 2;
-    signalSettings.upSampleInputBufferType =
-      oversimple::BufferType::plain;
+    signalSettings.upSampleInputBufferType = oversimple::BufferType::plain;
     signalSettings.upSampleOutputBufferType =
       oversimple::BufferType::interleaved;
     signalSettings.downSampleInputBufferType =
@@ -187,21 +186,19 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 
     Oversampling oversampling;
     oversampling.signal = std::make_unique<Oversampler>(signalSettings);
-    oversampling.dry =
-      std::make_unique<Oversampler>(signalSettings);
+    oversampling.dry = std::make_unique<Oversampler>(signalSettings);
     oversampling.sidechain = std::make_unique<Oversampler>(sidechainSettings);
     return oversampling;
   }())
-
   , oversamplingAttachments(parameters.oversampling,
                             *parameters.apvts,
-                            this,
-                            &oversampling,
-                            &oversamplingSettings,
-                            &oversamplingMutex)
+                            [this](int order, bool linearPhase) {
+                              auto const latency =
+                                oversampling.signal->getLatency(order,
+                                                                linearPhase);
+                              setLatencySamples(latency);
+                            })
 {
-
-
 
   levelVuMeterResults[0].store(-500.f);
   levelVuMeterResults[1].store(-500.f);
@@ -222,11 +219,9 @@ CurvessorAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
   floatToDouble = AudioBuffer<double>(4, samplesPerBlock);
 
-  if (oversamplingSettings.numSamplesPerBlock != samplesPerBlock) {
-    auto const guard = std::lock_guard<std::recursive_mutex>(oversamplingMutex);
-    oversamplingSettings.numSamplesPerBlock = samplesPerBlock;
-    oversampling = std::make_unique<Oversampling>(oversamplingSettings);
-  }
+  oversampling.signal->prepareBuffers(samplesPerBlock);
+  oversampling.dry->prepareBuffers(samplesPerBlock);
+  oversampling.sidechain->prepareBuffers(samplesPerBlock);
 
   reset();
 }
@@ -302,6 +297,15 @@ void
 CurvessorAudioProcessor::releaseResources()
 {
   floatToDouble = AudioBuffer<double>(0, 0);
+}
+
+inline void
+CurvessorAudioProcessor::reset()
+{
+  dsp->reset(parameters);
+  oversampling.signal->reset();
+  oversampling.dry->reset();
+  oversampling.sidechain->reset();
 }
 
 //==============================================================================

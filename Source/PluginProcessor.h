@@ -21,9 +21,10 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 
 #include "GammaEnvEditor.h"
 #include "Linkables.h"
-#include "OversamplingParameters.h"
 #include "SimpleLookAndFeel.h"
 #include "SplineParameters.h"
+#include "oversimple/Oversampling.hpp"
+#include "OversamplingParameters.h"
 #include "adsp/GammaEnv.hpp"
 #include "adsp/Spline.hpp"
 #include <JuceHeader.h>
@@ -141,9 +142,7 @@ private:
   };
   
   Oversampling oversampling;
-
-  std::recursive_mutex oversamplingMutex;
-  OversamplingAttachments<double, std::recursive_mutex> oversamplingAttachments;
+  OversamplingAttachments<double> oversamplingAttachments;
 
 public:
   // for gui
@@ -164,7 +163,7 @@ public:
   //==============================================================================
   void prepareToPlay(double sampleRate, int samplesPerBlock) override;
   void releaseResources() override;
-  void reset() override { dsp->reset(parameters); }
+  void reset() override;
 
 #ifndef JucePlugin_PreferredChannelConfigurations
   bool isBusesLayoutSupported(const BusesLayout& layouts) const override;
