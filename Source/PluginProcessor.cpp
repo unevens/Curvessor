@@ -165,18 +165,33 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 
   , envelopeFollowerSettings(dsp->envelopeFollower)
 
-  , oversamplingSettings([this] {
-    auto oversamplingSettings = OversamplingSettings{};
-    oversamplingSettings.numScalarToVecUpsamplers = 3;
-    oversamplingSettings.numVecToVecDownsamplers = 2;
-    oversamplingSettings.numChannels = 2;
-    oversamplingSettings.updateLatency = [this](int latency) {
-      setLatencySamples(latency);
-    };
-    return oversamplingSettings;
-  }())
+  , oversampling([] {
+    oversimple::OversamplingSettings signalSettings;
+    signalSettings.numDownSampledChannels = 2;
+    signalSettings.numDownSampledChannels = 2;
+    signalSettings.upSampleInputBufferType =
+      oversimple::BufferType::plain;
+    signalSettings.upSampleOutputBufferType =
+      oversimple::BufferType::interleaved;
+    signalSettings.downSampleInputBufferType =
+      oversimple::BufferType::interleaved;
+    signalSettings.downSampleOutputBufferType =
+      oversimple::BufferType::interleaved;
 
-  , oversampling(std::make_unique<Oversampling>(oversamplingSettings))
+    oversimple::OversamplingSettings sidechainSettings;
+    sidechainSettings.numDownSampledChannels = 2;
+    sidechainSettings.numDownSampledChannels = 0;
+    sidechainSettings.upSampleInputBufferType = oversimple::BufferType::plain;
+    sidechainSettings.upSampleOutputBufferType =
+      oversimple::BufferType::interleaved;
+
+    Oversampling oversampling;
+    oversampling.signal = std::make_unique<Oversampler>(signalSettings);
+    oversampling.dry =
+      std::make_unique<Oversampler>(signalSettings);
+    oversampling.sidechain = std::make_unique<Oversampler>(sidechainSettings);
+    return oversampling;
+  }())
 
   , oversamplingAttachments(parameters.oversampling,
                             *parameters.apvts,
@@ -185,6 +200,9 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
                             &oversamplingSettings,
                             &oversamplingMutex)
 {
+
+
+
   levelVuMeterResults[0].store(-500.f);
   levelVuMeterResults[1].store(-500.f);
   gainVuMeterResults[0].store(0.f);

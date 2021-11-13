@@ -125,17 +125,23 @@ private:
 
   adsp::GammaEnvSettings<Vec2d> envelopeFollowerSettings;
 
-  ScalarBuffer<double> dryBuffer{ 2 };
+  Buffer<double> dryBuffer{ 2 };
 
   // buffer for single precision processing call
   AudioBuffer<double> floatToDouble;
 
   // oversampling
-  using Oversampling = oversimple::Oversampling<double>;
-  using OversamplingSettings = oversimple::OversamplingSettings;
+  using Oversampler = oversimple::TOversampling<double>;
 
-  OversamplingSettings oversamplingSettings;
-  std::unique_ptr<Oversampling> oversampling;
+  struct Oversampling
+  {
+    std::unique_ptr<Oversampler> signal;
+    std::unique_ptr<Oversampler> dry;
+    std::unique_ptr<Oversampler> sidechain;
+  };
+  
+  Oversampling oversampling;
+
   std::recursive_mutex oversamplingMutex;
   OversamplingAttachments<double, std::recursive_mutex> oversamplingAttachments;
 
