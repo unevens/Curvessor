@@ -56,13 +56,32 @@ applyGain(double** io,
   }
 }
 
+
+#if AVEC_X86
+
+static inline Vec2d permute2_10(Vec2d const in) {
+    return permute2<1, 0>(in);
+}
+
+#endif
+
+#if AVEC_ARM
+
+static inline Vec2d permute2_10(Vec2d const in) {
+    auto const a = vget_high_f64(in);
+    auto const b = vget_low_f64(in);
+    return vcombine_f64(a, b);
+}
+
+#endif
+
 static inline Vec2d
 applyStereoLink(Vec2d in,
                 Vec2d& stereo_link,
                 Vec2d& stereo_link_target,
                 Vec2d alpha)
 {
-  auto const mean = 0.5 * (in + permute2<1, 0>(in));
+  auto const mean = 0.5 * (in + permute2_10(in));
   stereo_link = stereo_link_target + alpha * (stereo_link - stereo_link_target);
   return in + stereo_link * (mean - in);
 }
