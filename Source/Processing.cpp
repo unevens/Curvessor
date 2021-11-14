@@ -327,22 +327,23 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   dsp->stereoLinkTarget = 0.01 * parameters.stereoLink->get();
 
-  auto const oversamplingOrder = static_cast<uint32_t>(parameters.oversampling.order->getValue());
+  auto const oversamplingOrder =
+    static_cast<uint32_t>(parameters.oversampling.order->getValue());
   auto const oversamplingRate = static_cast<double>(1 << oversamplingOrder);
+  auto const isOversampling = oversamplingOrder > 0;
 
-  oversampling.signal->setOrder(oversamplingOrder);
-  oversampling.dry->setOrder(oversamplingOrder);
-  oversampling.sidechain->setOrder(oversamplingOrder);
+  if (isOversampling) {
+    oversampling.signal.setOrder(oversamplingOrder);
+    oversampling.dry.setOrder(oversamplingOrder);
+    oversampling.sidechain.setOrder(oversamplingOrder);
 
-  auto const isUsingLinearPhase = parameters.oversampling.linearPhase.getValue();
+    auto const isUsingLinearPhase =
+      parameters.oversampling.linearPhase.getValue();
 
-  oversampling.signal->setOrder(oversamplingOrder);
-  oversampling.dry->setOrder(oversamplingOrder);
-  oversampling.sidechain->setOrder(oversamplingOrder);
-
-  oversampling.signal->setUseLinearPhase(isUsingLinearPhase);
-  oversampling.dry->setUseLinearPhase(isUsingLinearPhase);
-  oversampling.sidechain->setUseLinearPhase(isUsingLinearPhase);
+    oversampling.signal.setUseLinearPhase(isUsingLinearPhase);
+    oversampling.dry.setUseLinearPhase(isUsingLinearPhase);
+    oversampling.sidechain.setUseLinearPhase(isUsingLinearPhase);
+  }
 
   double const invUpsampledSampleRate =
     1.0 / (getSampleRate() * oversamplingRate);
@@ -457,24 +458,33 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   // oversampling
 
-  //oversampling->prepareBuffers(numSamples); // extra safety measure
+  // oversampling->prepareBuffers(numSamples); // extra safety measure
 
-  int const numUpsampledSamples =
-    oversampling.signal->upSample(ioAudio, numSamples);
+  if (isOversampling) {
+    auto const numUpsampledSamples =
+      oversampling.signal.upSample(ioAudio, numSamples);
 
-  oversampling.dry->upSample(dryBuffer.get(), numSamples);
+    oversampling.dry.upSample(dryBuffer.get(), numSamples);
 
-
-  if (numUpsampledSamples == 0) {
-    for (auto i = 0; i < totalNumOutputChannels; ++i) {
-      buffer.clear(i, 0, numSamples);
+    if (numUpsampledSamples == 0) {
+      for (auto i = 0; i < totalNumOutputChannels; ++i) {
+        buffer.clear(i, 0, numSamples);
+      }
+      return;
     }
-    return;
   }
 
-  auto& upsampledBuffer = oversampling.signal->getUpSampleOutputInterleaved();
+  auto& upsampledBuffer = oversampling.signal.getUpSampleOutputInterleaved();
   auto& upsampledIo = upsampledBuffer.getBuffer2(0);
-  auto& upsampledDryBuffer = oversampling.dry->getUpSampleOutputInterleaved();
+  auto& upsampledDryBuffer = oversampling.dry.getUpSampleOutputInterleaved();
+
+  if (!isOversampling) {
+    upsampledBuffer.setNumSamples(numSamples);
+    upsampledBuffer.interleave(ioAudio, 2, numSamples);
+
+    upsampledDryBuffer.setNumSamples(numSamples);
+    upsampledDryBuffer.interleave(dryBuffer.get(), 2, numSamples);
+  }
 
   // sidechain
 
@@ -494,12 +504,10 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
               numSamples);
   }
 
-  oversampling.sidechain->upSample(envelopeInput, numSamples);
-
+  oversampling.sidechain.upSample(envelopeInput, numSamples);
 
   auto& upsampledSideChainInput =
-    oversampling.sidechain->getUpSampleOutputInterleaved().getBuffer2(
-      0);
+    oversampling.sidechain.getUpSampleOutputInterleaved().getBuffer2(0);
 
   // processing
 
@@ -583,14 +591,19 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
 
   // downsampling
 
-  oversampling.signal->downSample(upsampledBuffer, numSamples);
-  oversampling.dry->downSample(upsampledDryBuffer, numSamples);
-
+  if (isOversampling) {
+    oversampling.signal.downSample(upsampledBuffer, numSamples);
+    oversampling.dry.downSample(upsampledDryBuffer, numSamples);
+  }
 
   // dry-wet and output gain
 
-  auto& wetOutput = oversampling.signal->getDownSampleOutputInterleaved();
-  auto& dryOutput = oversampling.dry->getDownSampleOutputInterleaved();
+  auto& wetOutput = isOversampling
+                      ? oversampling.signal.getDownSampleOutputInterleaved()
+                      : upsampledBuffer;
+  auto& dryOutput = isOversampling
+                      ? oversampling.dry.getDownSampleOutputInterleaved()
+                      : upsampledDryBuffer;
 
   if (isWetPassNeeded) {
 

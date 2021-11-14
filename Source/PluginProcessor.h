@@ -136,9 +136,9 @@ private:
 
   struct Oversampling
   {
-    std::unique_ptr<Oversampler> signal;
-    std::unique_ptr<Oversampler> dry;
-    std::unique_ptr<Oversampler> sidechain;
+    Oversampler signal;
+    Oversampler dry;
+    Oversampler sidechain;
   };
   
   Oversampling oversampling;

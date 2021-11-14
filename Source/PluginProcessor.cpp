@@ -184,17 +184,16 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
     sidechainSettings.upSampleOutputBufferType =
       oversimple::BufferType::interleaved;
 
-    Oversampling oversampling;
-    oversampling.signal = std::make_unique<Oversampler>(signalSettings);
-    oversampling.dry = std::make_unique<Oversampler>(signalSettings);
-    oversampling.sidechain = std::make_unique<Oversampler>(sidechainSettings);
-    return oversampling;
+    return Oversampling{ Oversampler(signalSettings),
+                         Oversampler(signalSettings),
+                         Oversampler(sidechainSettings) };
+
   }())
   , oversamplingAttachments(parameters.oversampling,
                             *parameters.apvts,
                             [this](int order, bool linearPhase) {
                               auto const latency =
-                                oversampling.signal->getLatency(order,
+                                oversampling.signal.getLatency(order,
                                                                 linearPhase);
                               setLatencySamples(latency);
                             })
@@ -219,9 +218,9 @@ CurvessorAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
   floatToDouble = AudioBuffer<double>(4, samplesPerBlock);
 
-  oversampling.signal->prepareBuffers(samplesPerBlock);
-  oversampling.dry->prepareBuffers(samplesPerBlock);
-  oversampling.sidechain->prepareBuffers(samplesPerBlock);
+  oversampling.signal.prepareBuffers(samplesPerBlock);
+  oversampling.dry.prepareBuffers(samplesPerBlock);
+  oversampling.sidechain.prepareBuffers(samplesPerBlock);
 
   reset();
 }
@@ -303,9 +302,9 @@ inline void
 CurvessorAudioProcessor::reset()
 {
   dsp->reset(parameters);
-  oversampling.signal->reset();
-  oversampling.dry->reset();
-  oversampling.sidechain->reset();
+  oversampling.signal.reset();
+  oversampling.dry.reset();
+  oversampling.sidechain.reset();
 }
 
 //==============================================================================
