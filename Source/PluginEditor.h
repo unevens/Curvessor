@@ -44,8 +44,10 @@ private:
   AttachedToggle midSide;
   AttachedToggle sideChain;
 
-  AttachedComboBox oversampling;
-  AttachedToggle linearPhase;
+  ComboBox oversampling;
+  std::unique_ptr<ComboBoxParameterAttachment> oversamplingAttachment;
+  ToggleButton linearPhase;
+  ButtonParameterAttachment linearPhaseAttachment;
   Label oversamplingLabel{ {}, "Oversampling" };
   AttachedSlider stereoLink;
   Label stereoLinkLabel{ {}, "Stereo Link" };

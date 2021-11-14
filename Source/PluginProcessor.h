@@ -24,7 +24,6 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 #include "SimpleLookAndFeel.h"
 #include "SplineParameters.h"
 #include "oversimple/Oversampling.hpp"
-#include "OversamplingParameters.h"
 #include "adsp/GammaEnv.hpp"
 #include "adsp/Spline.hpp"
 #include <JuceHeader.h>
@@ -59,7 +58,8 @@ private:
     GammaEnvParameters envelopeFollower;
     AudioParameterFloat* stereoLink;
     AudioParameterFloat* smoothingTime;
-    OversamplingParameters oversampling;
+    AudioParameterChoice* oversamplingOrder;
+    AudioParameterBool* oversamplingLinearPhase;
     LinkableParameter<AudioParameterFloat> highPassCutoff;
     AudioParameterChoice* highPassOrder;
 
@@ -142,7 +142,6 @@ private:
   };
   
   Oversampling oversampling;
-  OversamplingAttachments<double> oversamplingAttachments;
 
 public:
   // for gui
@@ -153,6 +152,8 @@ public:
 
   std::array<std::atomic<float>, 2> levelVuMeterResults;
   std::array<std::atomic<float>, 2> gainVuMeterResults;
+
+  void updateOversamplingLatency();
 
   // AudioProcessor interface
 

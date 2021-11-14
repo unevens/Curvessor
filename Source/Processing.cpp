@@ -328,7 +328,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
   dsp->stereoLinkTarget = 0.01 * parameters.stereoLink->get();
 
   auto const oversamplingOrder =
-    static_cast<uint32_t>(parameters.oversampling.order->getValue());
+    static_cast<uint32_t>(parameters.oversamplingOrder->getIndex());
   auto const oversamplingRate = static_cast<double>(1 << oversamplingOrder);
   auto const isOversampling = oversamplingOrder > 0;
 
@@ -338,7 +338,7 @@ CurvessorAudioProcessor::processBlock(AudioBuffer<double>& buffer,
     oversampling.sidechain.setOrder(oversamplingOrder);
 
     auto const isUsingLinearPhase =
-      parameters.oversampling.linearPhase.getValue();
+      parameters.oversamplingLinearPhase->get();
 
     oversampling.signal.setUseLinearPhase(isUsingLinearPhase);
     oversampling.dry.setUseLinearPhase(isUsingLinearPhase);

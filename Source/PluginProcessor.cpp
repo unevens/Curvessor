@@ -35,7 +35,7 @@ CurvessorAudioProcessor::Parameters::Parameters(
     auto p = new AudioParameterFloat(
       name, name, { min, max, step, skewFactor, symmetricSkew }, value);
     layout.add(std::unique_ptr<RangedAudioParameter>(p));
-    return static_cast<AudioParameterFloat*>(p);
+    return p;
   };
 
   auto const createWrappedBoolParameter = [&](String name, bool value) {
@@ -47,14 +47,14 @@ CurvessorAudioProcessor::Parameters::Parameters(
   auto const createBoolParameter = [&](String name, bool value) {
     auto p = new AudioParameterBool(name, name, value);
     layout.add(std::unique_ptr<RangedAudioParameter>(p));
-    return static_cast<AudioParameterBool*>(p);
+    return p;
   };
 
   auto const createChoiceParameter =
     [&](String name, StringArray choices, int defaultIndex = 0) {
       auto p = new AudioParameterChoice(name, name, choices, defaultIndex);
       layout.add(std::unique_ptr<RangedAudioParameter>(p));
-      return static_cast<AudioParameterChoice*>(p);
+      return p;
     };
 
   String const ch0Suffix = "_ch0";
@@ -92,10 +92,11 @@ CurvessorAudioProcessor::Parameters::Parameters(
 
   sideChain = createBoolParameter("SideChain", false);
 
-  oversampling = { static_cast<RangedAudioParameter*>(createChoiceParameter(
-                     "Oversampling", { "1x", "2x", "4x", "8x", "16x", "32x" })),
-                   createWrappedBoolParameter("Linear-Phase-Oversampling",
-                                              false) };
+  oversamplingOrder = createChoiceParameter(
+    "Oversampling", { "1x", "2x", "4x", "8x", "16x", "32x" });
+
+  oversamplingLinearPhase =
+    createBoolParameter("Linear-Phase-Oversampling", false);
 
   inputGain = createLinkableFloatParameters(
     "Input-Gain", 0.f, -48.f, 48.f, 0.01f, 0.25f, true);
@@ -150,6 +151,20 @@ CurvessorAudioProcessor::Parameters::Parameters(
       processor, nullptr, "CURVESSOR2-PARAMETERS", std::move(layout)));
 }
 
+void
+CurvessorAudioProcessor::updateOversamplingLatency()
+{
+  auto const order = parameters.oversamplingOrder->getIndex();
+  auto const linearPhase = parameters.oversamplingLinearPhase->get();
+  if (linearPhase) {
+    auto const latency = oversampling.signal.getLatency(order, true);
+    setLatencySamples(latency);
+  }
+  else {
+    setLatencySamples(0);
+  }
+}
+
 CurvessorAudioProcessor::CurvessorAudioProcessor()
 
 #ifndef JucePlugin_PreferredChannelConfigurations
@@ -187,16 +202,7 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
     return Oversampling{ Oversampler(signalSettings),
                          Oversampler(signalSettings),
                          Oversampler(sidechainSettings) };
-
   }())
-  , oversamplingAttachments(parameters.oversampling,
-                            *parameters.apvts,
-                            [this](int order, bool linearPhase) {
-                              auto const latency =
-                                oversampling.signal.getLatency(order,
-                                                                linearPhase);
-                              setLatencySamples(latency);
-                            })
 {
 
   levelVuMeterResults[0].store(-500.f);
@@ -288,6 +294,7 @@ CurvessorAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
   if (xmlState.get() != nullptr) {
     if (xmlState->hasTagName(parameters.apvts->state.getType())) {
       parameters.apvts->replaceState(ValueTree::fromXml(*xmlState));
+      updateOversamplingLatency();
     }
   }
 }

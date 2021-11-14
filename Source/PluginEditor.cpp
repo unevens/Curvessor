@@ -75,20 +75,19 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
   , highPassCutoffLabels(*p.getCurvessorParameters().apvts, "Mid-Side")
 
-  , oversampling(*this,
-                 *p.getCurvessorParameters().apvts,
-                 "Oversampling",
-                 { "1x", "2x", "4x", "8x", "16x", "32x" })
 
-  , linearPhase(*this,
-                *p.getCurvessorParameters().apvts,
-                "Linear-Phase-Oversampling")
+
+  , linearPhaseAttachment(*p.getCurvessorParameters().oversamplingLinearPhase,
+                          linearPhase)
 
   , smoothing(*this, *p.getCurvessorParameters().apvts, "Smoothing-Time")
 
   , background(ImageCache::getFromMemory(BinaryData::background_png,
                                          BinaryData::background_pngSize))
 {
+  oversampling.onChange = [this] { processor.updateOversamplingLatency(); };
+  linearPhase.onClick = [this] { processor.updateOversamplingLatency(); };
+
   addAndMakeVisible(spline);
   addAndMakeVisible(selectedKnot);
   addAndMakeVisible(inputGain);
@@ -106,6 +105,8 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   addAndMakeVisible(highPassLabelFirsLine);
   addAndMakeVisible(highPassLabelSecondLine);
   addAndMakeVisible(url);
+  addAndMakeVisible(oversampling);
+  addAndMakeVisible(linearPhase);
 
   spline.xSuffix = "dB";
   spline.ySuffix = "dB";
@@ -131,8 +132,10 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
     highPassCutoff.getControl(c).setTextValueSuffix("hz");
   }
 
-  linearPhase.getControl().setButtonText("Linear Phase");
-
+  linearPhase.setButtonText("Linear Phase");
+  oversampling.addItemList({ "1x", "2x", "4x", "8x", "16x", "32x" }, 1);
+  oversamplingAttachment = std::make_unique<ComboBoxParameterAttachment>(
+    *p.getCurvessorParameters().oversamplingOrder, oversampling);
   stereoLink.getControl().setTextValueSuffix("%");
 
   lineColour = p.looks.frontColour.darker(1.f);
@@ -312,12 +315,12 @@ CurvessorAudioProcessorEditor::resized()
       .withAlignSelf(GridItem::AlignSelf::start)
       .withJustifySelf(GridItem::JustifySelf::center),
     GridItem(oversamplingLabel).withAlignSelf(GridItem::AlignSelf::start),
-    GridItem(oversampling.getControl())
+    GridItem(oversampling)
       .withWidth(std::max(60.0L, 70._p))
       .withHeight(30._p)
       .withAlignSelf(GridItem::AlignSelf::start)
       .withJustifySelf(GridItem::JustifySelf::center),
-    GridItem(linearPhase.getControl())
+    GridItem(linearPhase)
       .withWidth(130._p)
       .withAlignSelf(GridItem::AlignSelf::start)
       .withJustifySelf(GridItem::JustifySelf::center)
