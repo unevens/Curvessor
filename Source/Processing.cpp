@@ -147,12 +147,12 @@ CurvessorAudioProcessor::Dsp::forwardProcess(VecBuffer<Vec2d>& io,
 
   autoSpline.spline.update(spline, numActiveKnots);
   envelope.update(envelopeFollower);
-  _mm_store_pd(stereoLink, stereo_link);
-  _mm_store_pd(gainVuMeterBuffer, gain_vumeter);
-  _mm_store_pd(levelVuMeterBuffer, level_vumeter);
-  _mm_store_pd(highPassState, high_pass_state);
-  _mm_store_pd(highPassState2, high_pass_state_2);
-  _mm_store_pd(highPassState3, high_pass_state_3);
+  stereo_link.store(stereoLink);
+  gain_vumeter.store(gainVuMeterBuffer);
+  level_vumeter.store(levelVuMeterBuffer);
+  high_pass_state.store(highPassState);
+  high_pass_state_2.store(highPassState2);
+  high_pass_state_3.store(highPassState3);
 }
 
 template<int highPassOrder>
@@ -201,6 +201,10 @@ CurvessorAudioProcessor::Dsp::feedbackProcess(VecBuffer<Vec2d>& io,
       env_in = applyHighPassFilter(env_in, high_pass_state_2, high_pass_coef);
     }
 
+    if constexpr (highPassOrder >= 3) {
+      env_in = applyHighPassFilter(env_in, high_pass_state_3, high_pass_coef);
+    }
+      
     Vec2d env_out = envelope.processDB(env_in);
 
     env_out = applyStereoLink(
