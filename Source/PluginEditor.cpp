@@ -75,8 +75,6 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
 
   , highPassCutoffLabels(*p.getCurvessorParameters().apvts, "Mid-Side")
 
-
-
   , linearPhaseAttachment(*p.getCurvessorParameters().oversamplingLinearPhase,
                           linearPhase)
 
