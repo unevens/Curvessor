@@ -12,32 +12,37 @@ But more specifically, as it allows the authoring of response curves _that are n
 
 - The response curves are smoothly automatable splines.
 - Optional Mid/Side Stereo processing.
-- Forward, Feedback and Sidechain topologies. 
-- The amount of feedback can be smoothly changed, going from pure forward topology to pure feedback topology and everything in between. _(NEW in verison 2)_
-- Optional RMS and high-pass filtering on the level detector _(NEW in verison 2)_
-- All parameters, and all splines, can have different values on the Left channel and on the Right channel - or on the Mid channel and on the Side channel, when in Mid/Side Stero Mode.
+- Forward, Feedback and Sidechain topologies.
+- The amount of feedback can be smoothly changed, going from pure forward topology to pure feedback topology and everything in between. _(NEW in version 2)_
+- Optional RMS and high-pass filtering on the level detector. _(NEW in version 2)_
+- All parameters, and all splines, can have different values on the Left channel and on the Right channel - or on the Mid channel and on the Side channel, when in Mid/Side Stereo Mode.
 - Dry-Wet.
 - Up to 32x Oversampling with either Minimum Phase or Linear Phase Antialiasing.
 - VU meter showing the difference between the input level and the output level.
 - Customizable smoothing time, used to avoid zips when automating the knots of the splines, the stereo link percentage, the wet amount, or the input and output gains.
 
-## Build
+## Download
 
-Clone with
+Pre-built binaries:
 
-`git clone --recursive https://github.com/unevens/Curvessor`
+- **macOS** (universal — Apple Silicon + Intel): see the [Releases](https://github.com/unevens/Curvessor/releases) page. Each macOS zip contains the AU + VST3 bundles, the `legal/` folder, and a `README.txt` with install instructions (including the `xattr -dr com.apple.quarantine` step needed for unsigned OSS plug-ins).
+- **Windows / Linux**: https://www.unevens.net/curvessor.html
 
-Curvessor uses the [JUCE](https://github.com/WeAreROLI/JUCE) cross-platform C++ framework.
+## Build from source
 
-You'll need [Projucer](https://shop.juce.com/get-juce) to open the file `Curvessor.jucer` and generate the platform specific builds.
+Clone recursively:
 
-### macOS (Apple Silicon)
+```
+git clone --recursive https://github.com/unevens/Curvessor
+```
 
-The CMake build at the repository root targets macOS. Apple's bundled Clang
-(both Xcode 17's and Command Line Tools 21's) has a NEON-intrinsic codegen
-bug that triggers a frontend bus error when compiling
-`Source/CurvessorDsp.cpp`. The bug is fixed in upstream LLVM, so build with
-**Homebrew Clang 22 or later**:
+Curvessor uses the [JUCE](https://github.com/juce-framework/JUCE) C++ framework, referenced as a sibling checkout at `../JUCE`. Clone JUCE 8 next to this repo before building.
+
+The authoritative build is CMake (`CMakeLists.txt` at the repo root). The old Projucer `.jucer` file has been removed — see git history if you need it.
+
+### macOS
+
+Apple's bundled Clang (Xcode 17, Command Line Tools 21) and any upstream Clang older than 22 hit a NEON-intrinsic codegen bug in `Source/CurvessorDsp.cpp`. The fix shipped in upstream LLVM 22, so build with **Homebrew Clang ≥ 22**:
 
 ```
 brew install llvm
@@ -50,45 +55,52 @@ cmake -S . -B build \
 cmake --build build -j8
 ```
 
-`CMakeLists.txt` enforces this — configuring with Apple Clang or any clang
-older than 22 fails immediately with a message pointing at the right
-compiler. It also auto-derives `llvm-ar` / `llvm-ranlib` from the chosen
-compiler's toolchain dir, so you do not need to set `CMAKE_AR` /
-`CMAKE_RANLIB` yourself. (Both are required because LTO is on
-(`juce_recommended_lto_flags`), and the LLVM bitcode object files the
-compiler emits cannot be archived by Apple's `/usr/bin/ar`.)
+`CMakeLists.txt` enforces this — configuring with Apple Clang or any clang older than 22 fails immediately with a message pointing at the right compiler. It also auto-derives `llvm-ar` / `llvm-ranlib` from the chosen compiler's toolchain dir.
 
-This builds Standalone, AU, and VST3 to `build/Curvessor_artefacts/Release/`.
-After each successful build, JUCE also copies the AU and VST3 to the standard
-user plugin folders:
+This produces Standalone, AU, and VST3 in `build/Curvessor_artefacts/Release/`. The plug-ins are also copied to your user plug-in folders for an immediate DAW reload:
 
 - `~/Library/Audio/Plug-Ins/Components/Curvessor 2.1.component`
 - `~/Library/Audio/Plug-Ins/VST3/Curvessor 2.1.vst3`
 
-The Standalone `.app` is not auto-installed (no macOS convention for that) and
-must be run from the build directory or copied manually. To disable the
-auto-install, change `COPY_PLUGIN_AFTER_BUILD TRUE` to `FALSE` in
-`CMakeLists.txt`.
+#### Build options
 
-## Supported platforms
+| Option | Default | Description |
+|---|---|---|
+| `INSTALL_TO_USER_PLUGINS` | `ON` | Copy AU/VST3 to `~/Library/Audio/Plug-Ins/*` after build. Disable with `-DINSTALL_TO_USER_PLUGINS=OFF` for CI/release builds. |
+| `UNIVERSAL` | `OFF` | Build a universal arm64 + x86_64 binary. Required for release distribution. |
 
-Curvessor is developed and tested on Windows and Linux. macOS (Apple Silicon)
-is supported via the CMake build above; see the macOS section.
+#### Release zips
 
-VST and VST3 binaries are available at https://www.unevens.net/curvessor.html.
+`cmake --build build --target package-zip` stages a folder ready to be zipped:
+
+```
+build/release-zip/Curvessor 2.1 (macOS)/
+├── Curvessor 2.1.component
+├── Curvessor 2.1.vst3
+├── legal/
+└── README.txt
+```
+
+Use `-DUNIVERSAL=ON -DINSTALL_TO_USER_PLUGINS=OFF` when configuring the release build dir so the bundles run on Intel as well as Apple Silicon and the build doesn't touch your live `~/Library/Audio/Plug-Ins`.
+
+### Windows / Linux
+
+The CMake build is cross-platform via JUCE's `juce_add_plugin`, but the Windows and Linux builds have not been regression-tested since the migration off Projucer. Adapt the `cmake` invocations above for your platform's compiler and report any breakage.
 
 ## Submodules, libraries, credits
 
-- The [oversimple](https://github.com/unevens/oversimple) submodule is a wrapper around two resampling libraries:
-    - [HIIR](https://github.com/unevens/hiir) by Laurent de Soras, *"a 2x Upsampler/Downsampler with two-path polyphase IIR anti-aliasing filtering"*.
-    - [r8brain-free-src](https://github.com/avaneev/r8brain-free-src), *"an high-quality pro audio sample rate converter / resampler C++ library"* by Aleksey Vaneev.
-- [audio-dsp](https://github.com/unevens/audio-dsp), my toolbox for audio dsp and SIMD instructions, which uses Agner Fog's [vectorclass](https://github.com/vectorclass/version2) and [Boost.Align](https://www.boost.org/doc/libs/1_71_0/doc/html/align.html).
-- [gamma-env](https://github.com/avaneev/gammaenv): *"DSP S-curve envelope signal generator"*, by Aleksey Vaneev. Curvessor uses a SIMD optimized version of gammaenv that I wrote specifically for it. See the files `audio-dsp/adsp/GammaEnv.hpp` and `audio-dsp/adsp/GammaEnvMacro.hpp`.
+- [oversimple](https://github.com/unevens/oversimple) wraps two resampling libraries:
+    - [HIIR](http://ldesoras.free.fr/prod.html) by Laurent de Soras — a 2x Upsampler/Downsampler with two-path polyphase IIR anti-aliasing filtering.
+    - [r8brain-free-src](https://github.com/avaneev/r8brain-free-src) by Aleksey Vaneev — a high-quality pro audio sample rate converter / resampler C++ library.
+- [audio-dsp](https://github.com/unevens/audio-dsp), my toolbox for audio DSP and SIMD instructions, built on Agner Fog's [vectorclass](https://github.com/vectorclass/version2).
+- [gamma-env](https://github.com/avaneev/gammaenv) — DSP S-curve envelope signal generator by Aleksey Vaneev. Curvessor uses a SIMD-optimized version of gammaenv I wrote specifically for it; see `audio-dsp/adsp/GammaEnv.hpp` and `audio-dsp/adsp/GammaEnvMacro.hpp`.
+- [juicy](https://github.com/unevens/juicy), my JUCE-side UI/glue components (spline editor, attached controls, oversampling attachments).
 
-Curvessor is released under the GNU GPLv3 license.
+## License
+
+Curvessor is released under the GNU GPLv3 license. Full license text and third-party notices are in the [legal/](legal/) folder.
 
 VST is a trademark of Steinberg Media Technologies GmbH, registered in Europe and other countries.
-
 
 ## Version 1
 
