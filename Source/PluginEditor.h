@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Dario Mambro
+Copyright 2020-2026 Dario Mambro
 
 This file is part of Curvessor.
 
@@ -31,42 +31,55 @@ public:
   CurvessorAudioProcessorEditor(CurvessorAudioProcessor&);
   ~CurvessorAudioProcessorEditor();
 
-  void paint(Graphics&) override;
   void resized() override;
 
 private:
+  // The whole UI lives in design coordinates inside `Content`. The outer
+  // editor scales it via setTransform on resize, so child components and the
+  // juicy submodule never learn about runtime scaling.
+  struct Content : public Component
+  {
+    Content(CurvessorAudioProcessor&);
+    void paint(Graphics&) override;
+    void resized() override;
+
+    CurvessorAudioProcessor& processor;
+
+    SplineEditor spline;
+    SplineKnotEditor selectedKnot;
+    GammaEnvEditor gammaEnv;
+    GainVuMeter vuMeter;
+    AttachedToggle midSide;
+    AttachedToggle sideChain;
+
+    AttachedComboBox oversampling;
+    AttachedToggle linearPhase;
+    Label oversamplingLabel{ {}, "Oversampling" };
+    AttachedSlider stereoLink;
+    Label stereoLinkLabel{ {}, "Stereo Link" };
+    AttachedSlider smoothing;
+    Label smoothingLabel{ {}, "Smoothing Time" };
+    LinkableControl<AttachedSlider> inputGain;
+    LinkableControl<AttachedSlider> outputGain;
+    LinkableControl<AttachedSlider> wet;
+    LinkableControl<AttachedSlider> feedbackAmount;
+    LinkableControl<AttachedSlider> highPassCutoff;
+    AttachedComboBox highPassOrder;
+    ChannelLabels ioGainLabels;
+    ChannelLabels highPassCutoffLabels;
+    Label highPassLabelFirsLine{ {}, "Detector" };
+    Label highPassLabelSecondLine{ {}, "High Pass" };
+    TextEditor url;
+
+    Colour lineColour = Colours::white;
+    Colour backgroundColour = Colours::black.withAlpha(0.6f);
+
+    Image background;
+  };
+
   CurvessorAudioProcessor& processor;
-
-  SplineEditor spline;
-  SplineKnotEditor selectedKnot;
-  GammaEnvEditor gammaEnv;
-  GainVuMeter vuMeter;
-  AttachedToggle midSide;
-  AttachedToggle sideChain;
-
-  AttachedComboBox oversampling;
-  AttachedToggle linearPhase;
-  Label oversamplingLabel{ {}, "Oversampling" };
-  AttachedSlider stereoLink;
-  Label stereoLinkLabel{ {}, "Stereo Link" };
-  AttachedSlider smoothing;
-  Label smoothingLabel{ {}, "Smoothing Time" };
-  LinkableControl<AttachedSlider> inputGain;
-  LinkableControl<AttachedSlider> outputGain;
-  LinkableControl<AttachedSlider> wet;
-  LinkableControl<AttachedSlider> feedbackAmount;
-  LinkableControl<AttachedSlider> highPassCutoff;
-  AttachedComboBox highPassOrder;
-  ChannelLabels ioGainLabels;
-  ChannelLabels highPassCutoffLabels;
-  Label highPassLabelFirsLine{ {}, "Detector" };
-  Label highPassLabelSecondLine{ {}, "High Pass" };
-  TextEditor url;
-
-  Colour lineColour = Colours::white;
-  Colour backgroundColour = Colours::black.withAlpha(0.6f);
-
-  Image background;
+  Content content;
+  ComponentBoundsConstrainer constrainer;
 
   JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(CurvessorAudioProcessorEditor)
 };

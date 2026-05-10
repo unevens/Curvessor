@@ -1,5 +1,5 @@
 /*
-Copyright 2020 Dario Mambro
+Copyright 2020-2026 Dario Mambro
 
 This file is part of Curvessor.
 
@@ -20,12 +20,17 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 #include "PluginEditor.h"
 #include "PluginProcessor.h"
 
-CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
-  CurvessorAudioProcessor& p)
+namespace {
+constexpr int kDesignWidth = static_cast<int>(1022._p);
+constexpr int kDesignHeight = static_cast<int>(966._p);
+constexpr float kMinScale = 0.5f;
+constexpr float kMaxScale = 2.0f;
+constexpr char const* kEditorWidthProperty = "editorWidth";
+}
 
-  : AudioProcessorEditor(&p)
+CurvessorAudioProcessorEditor::Content::Content(CurvessorAudioProcessor& p)
 
-  , processor(p)
+  : processor(p)
 
   , spline(*p.getCurvessorParameters().spline,
            *p.getCurvessorParameters().apvts)
@@ -180,10 +185,8 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   url.setText("www.unevens.net", dontSendNotification);
   url.setJustification(Justification::left);
 
-  setSize(1022._p, 966._p);
+  setSize(kDesignWidth, kDesignHeight);
 }
-
-CurvessorAudioProcessorEditor::~CurvessorAudioProcessorEditor() {}
 
 constexpr auto offset = 10._p;
 constexpr auto rowHeight = 40._p;
@@ -197,7 +200,7 @@ constexpr auto offsetFromRight = 241._p;
 constexpr auto channelLabelsWidth = 55._p;
 
 void
-CurvessorAudioProcessorEditor::paint(Graphics& g)
+CurvessorAudioProcessorEditor::Content::paint(Graphics& g)
 {
   g.drawImage(background, getLocalBounds().toFloat());
 
@@ -227,7 +230,7 @@ CurvessorAudioProcessorEditor::paint(Graphics& g)
 }
 
 void
-CurvessorAudioProcessorEditor::resized()
+CurvessorAudioProcessorEditor::Content::resized()
 {
   spline.setTopLeftPosition(offset + 1, offset + 1);
   spline.setSize(splineEditorSide - 2, splineEditorSide - 2);
@@ -337,4 +340,52 @@ CurvessorAudioProcessorEditor::resized()
                          spline.getPosition().y,
                          jmax(spline.getWidth(), selectedKnot.getWidth()),
                          selectedKnot.getBottom() - spline.getPosition().y);
+}
+
+CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
+  CurvessorAudioProcessor& p)
+  : AudioProcessorEditor(&p)
+  , processor(p)
+  , content(p)
+{
+  addAndMakeVisible(content);
+
+  setResizable(true, true);
+  constrainer.setFixedAspectRatio(static_cast<double>(kDesignWidth) /
+                                  static_cast<double>(kDesignHeight));
+  constrainer.setSizeLimits(static_cast<int>(kDesignWidth * kMinScale),
+                            static_cast<int>(kDesignHeight * kMinScale),
+                            static_cast<int>(kDesignWidth * kMaxScale),
+                            static_cast<int>(kDesignHeight * kMaxScale));
+  setConstrainer(&constrainer);
+
+  auto& state = p.getCurvessorParameters().apvts->state;
+  int const savedWidth =
+    static_cast<int>(state.getProperty(kEditorWidthProperty, kDesignWidth));
+  int const initialWidth =
+    juce::jlimit(static_cast<int>(kDesignWidth * kMinScale),
+                 static_cast<int>(kDesignWidth * kMaxScale),
+                 savedWidth);
+  int const initialHeight = static_cast<int>(
+    initialWidth * static_cast<double>(kDesignHeight) /
+    static_cast<double>(kDesignWidth));
+  setSize(initialWidth, initialHeight);
+}
+
+CurvessorAudioProcessorEditor::~CurvessorAudioProcessorEditor() {}
+
+void
+CurvessorAudioProcessorEditor::resized()
+{
+  if (getWidth() <= 0 || getHeight() <= 0) {
+    return;
+  }
+
+  float const scale =
+    static_cast<float>(getWidth()) / static_cast<float>(kDesignWidth);
+  content.setTransform(AffineTransform::scale(scale));
+  content.setSize(kDesignWidth, kDesignHeight);
+
+  processor.getCurvessorParameters().apvts->state.setProperty(
+    kEditorWidthProperty, getWidth(), nullptr);
 }
