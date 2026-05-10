@@ -1,0 +1,3 @@
+Vector class library 
+(c) Copyright 2012-2020 Agner Fog.
+Apache License version 2.0 or later.
