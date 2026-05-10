@@ -66,22 +66,24 @@ This produces Standalone, AU, and VST3 in `build/Curvessor_artefacts/Release/`. 
 
 | Option | Default | Description |
 |---|---|---|
-| `INSTALL_TO_USER_PLUGINS` | `ON` | Copy AU/VST3 to `~/Library/Audio/Plug-Ins/*` after build. Disable with `-DINSTALL_TO_USER_PLUGINS=OFF` for CI/release builds. |
-| `UNIVERSAL` | `OFF` | Build a universal arm64 + x86_64 binary. Required for release distribution. |
+| `UNIVERSAL` | `ON` | Build a universal arm64+x86_64 binary so a single zip serves both Apple Silicon and Intel users. Disable with `-DUNIVERSAL=OFF` for ~2x faster single-arch dev iteration. |
+| `INSTALL_TO_USER_PLUGINS` | `ON` | Copy AU/VST3 to `~/Library/Audio/Plug-Ins/*` after build. Disable with `-DINSTALL_TO_USER_PLUGINS=OFF` for CI builds or when you don't want the build to touch your live plug-in folder. |
 
 #### Release zips
 
-`cmake --build build --target package-zip` stages a folder ready to be zipped:
+`cmake --build build --target package-zip` produces both a staging folder and a ready-to-upload zip:
 
 ```
-build/release-zip/Curvessor 2.1 (macOS)/
-├── Curvessor 2.1.component
-├── Curvessor 2.1.vst3
-├── legal/
-└── README.txt
+build/release-zip/
+├── Curvessor2.1_mac/
+│   ├── Curvessor 2.1.component
+│   ├── Curvessor 2.1.vst3
+│   ├── legal/
+│   └── README.txt
+└── Curvessor2.1_mac.zip
 ```
 
-Use `-DUNIVERSAL=ON -DINSTALL_TO_USER_PLUGINS=OFF` when configuring the release build dir so the bundles run on Intel as well as Apple Silicon and the build doesn't touch your live `~/Library/Audio/Plug-Ins`.
+The platform suffix becomes `_win` / `_linux` when built on those hosts.
 
 ### Windows / Linux
 

@@ -86,13 +86,49 @@ if(APPLE AND (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64"
     endif()
 endif()
 
-# Apple Silicon native; Universal binary support is opt-in via -DUNIVERSAL=ON.
-# For release zips you almost certainly want -DUNIVERSAL=ON so end users on
-# both Apple Silicon and Intel can use the same bundles.
+# Universal arm64 + x86_64 on macOS so a single zip serves both Apple
+# Silicon and Intel users. ON by default; flip to OFF
+# (-DUNIVERSAL=OFF) for fast single-arch dev iteration when you don't
+# need the x86_64 slice. Cost when ON: ~2x build time, ~2x binary size.
 if(APPLE)
-    option(UNIVERSAL "Build a universal arm64+x86_64 binary" OFF)
-    if(UNIVERSAL)
-        set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "" FORCE)
+    option(UNIVERSAL "Build a universal arm64+x86_64 binary" ON)
+endif()
+if(APPLE AND UNIVERSAL)
+    set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "" FORCE)
+
+    # Universal-build lipo shim.
+    #
+    # When building -arch arm64 -arch x86_64 with LTO on, clang compiles
+    # each TU once per arch and internally invokes `lipo` to combine the
+    # per-arch LLVM bitcode object files. Apple's bundled lipo
+    # (CommandLineTools and /usr/bin/lipo) is too old to read modern LLVM
+    # bitcode and fails with "Unknown attribute kind (105)". Homebrew llvm
+    # ships `llvm-lipo` which can, but clang's driver looks up the literal
+    # name `lipo` via getProgramPath, so we expose llvm-lipo under that
+    # name in a build-dir-local toolchain dir and add it to clang's program
+    # search path via -B. Same shape as the llvm-ar / llvm-ranlib
+    # auto-config above.
+    get_filename_component(_curvessor_clang_dir
+        "${CMAKE_CXX_COMPILER}" DIRECTORY)
+    if(EXISTS "${_curvessor_clang_dir}/llvm-lipo")
+        set(_curvessor_lipo_shim_dir "${CMAKE_BINARY_DIR}/_lipo_shim")
+        file(MAKE_DIRECTORY "${_curvessor_lipo_shim_dir}")
+        if(NOT EXISTS "${_curvessor_lipo_shim_dir}/lipo")
+            file(CREATE_LINK
+                "${_curvessor_clang_dir}/llvm-lipo"
+                "${_curvessor_lipo_shim_dir}/lipo"
+                SYMBOLIC)
+        endif()
+        add_compile_options("-B${_curvessor_lipo_shim_dir}")
+        add_link_options("-B${_curvessor_lipo_shim_dir}")
+        message(STATUS
+            "Curvessor: using ${_curvessor_lipo_shim_dir}/lipo -> "
+            "llvm-lipo (required for LTO bitcode in universal builds).")
+    else()
+        message(FATAL_ERROR
+            "llvm-lipo not found at ${_curvessor_clang_dir}/llvm-lipo. "
+            "Apple's lipo cannot read LLVM 22 bitcode object files. "
+            "Install Homebrew llvm (`brew install llvm`).")
     endif()
 endif()
 
@@ -199,34 +235,46 @@ target_link_libraries(Curvessor
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags)
 
-# Release-zip staging.
+# Release-zip staging + zipping.
 #
-# `cmake --build build --target package-zip` populates
-# build/release-zip/Curvessor 2.1 (macOS)/ with everything end users need:
-# the AU bundle, the VST3 bundle, the legal/ folder, and README.txt with
-# install + xattr instructions. Right-click that folder in Finder and
-# "Compress" to produce the distributable zip.
+# `cmake --build build --target package-zip` produces, in build/release-zip/:
+#   Curvessor2.1_<platform>/      — AU bundle, VST3 bundle, legal/, README.txt
+#   Curvessor2.1_<platform>.zip   — the same folder, zipped, ready to upload
+# where <platform> is mac / win / linux depending on the build host.
 #
 # For a real release, configure with -DUNIVERSAL=ON so the bundles run on
 # both Apple Silicon and Intel.
-set(_curvessor_zip_dir
-    "${CMAKE_BINARY_DIR}/release-zip/Curvessor 2.1 (macOS)")
+if(APPLE)
+    set(_curvessor_platform_suffix "mac")
+elseif(WIN32)
+    set(_curvessor_platform_suffix "win")
+elseif(UNIX)
+    set(_curvessor_platform_suffix "linux")
+else()
+    set(_curvessor_platform_suffix "unknown")
+endif()
+
+set(_curvessor_zip_basename "Curvessor2.1_${_curvessor_platform_suffix}")
+set(_curvessor_zip_stage
+    "${CMAKE_BINARY_DIR}/release-zip/${_curvessor_zip_basename}")
 
 add_custom_target(package-zip
-    COMMAND ${CMAKE_COMMAND} -E rm -rf "${_curvessor_zip_dir}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${_curvessor_zip_dir}"
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_BINARY_DIR}/release-zip"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${_curvessor_zip_stage}"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "$<TARGET_BUNDLE_DIR:Curvessor_AU>"
-        "${_curvessor_zip_dir}/Curvessor 2.1.component"
+        "${_curvessor_zip_stage}/Curvessor 2.1.component"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "$<TARGET_BUNDLE_DIR:Curvessor_VST3>"
-        "${_curvessor_zip_dir}/Curvessor 2.1.vst3"
+        "${_curvessor_zip_stage}/Curvessor 2.1.vst3"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_LIST_DIR}/legal"
-        "${_curvessor_zip_dir}/legal"
+        "${_curvessor_zip_stage}/legal"
     COMMAND ${CMAKE_COMMAND} -E copy
         "${CMAKE_CURRENT_LIST_DIR}/README.txt"
-        "${_curvessor_zip_dir}/README.txt"
+        "${_curvessor_zip_stage}/README.txt"
+    COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_BINARY_DIR}/release-zip"
+        zip -rq "${_curvessor_zip_basename}.zip" "${_curvessor_zip_basename}"
     DEPENDS Curvessor_AU Curvessor_VST3
-    COMMENT "Staging release zip contents at ${_curvessor_zip_dir}"
+    COMMENT "Building ${_curvessor_zip_basename}.zip in ${CMAKE_BINARY_DIR}/release-zip"
     VERBATIM)
