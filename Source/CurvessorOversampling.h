@@ -68,18 +68,11 @@ public:
       dry->setUseLinearPhase(oversamplingSettings->isUsingLinearPhase);
       sidechain->setUseLinearPhase(oversamplingSettings->isUsingLinearPhase);
 
-      // oversimple's setOrder asserts on 0; Curvessor's "1x" choice maps to
-      // user order 0 (bypass). Keep the internal samplers at order >= 1; the
-      // bypass decision is made in Processing.cpp by reading
-      // oversamplingSettings->order directly.
-      uint32_t const internalOrder = std::max<uint32_t>(1u, oversamplingSettings->order);
-      wet->setOrder(internalOrder);
-      dry->setOrder(internalOrder);
-      sidechain->setOrder(internalOrder);
+      wet->setOrder(oversamplingSettings->order);
+      dry->setOrder(oversamplingSettings->order);
+      sidechain->setOrder(oversamplingSettings->order);
 
-      int const latency =
-        oversamplingSettings->order == 0 ? 0 : static_cast<int>(wet->getLatency());
-      processor->setLatencySamples(latency);
+      processor->setLatencySamples(static_cast<int>(wet->getLatency()));
 
       processor->suspendProcessing(false);
     };
