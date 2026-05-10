@@ -20,11 +20,12 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 #pragma once
 
 #include "CurvessorDsp.h"
+#include "CurvessorOversampling.h"
 #include "GammaEnvEditor.h"
 #include "Linkables.h"
-#include "OversamplingParameters.h"
 #include "SimpleLookAndFeel.h"
 #include "SplineParameters.h"
+#include "avec/Buffer.hpp"
 #include <JuceHeader.h>
 
 #ifndef CURVESSOR_UI_SCALE
@@ -76,19 +77,18 @@ private:
 
   adsp::GammaEnvSettings<Vec2d> envelopeFollowerSettings;
 
-  ScalarBuffer<double> dryBuffer{ 2 };
+  avec::Buffer<double> dryBuffer{ 2 };
 
   // buffer for single precision processing call
   AudioBuffer<double> floatToDouble;
 
   // oversampling
-  using Oversampling = oversimple::Oversampling<double>;
-  using OversamplingSettings = oversimple::OversamplingSettings;
-
-  OversamplingSettings oversamplingSettings;
-  std::unique_ptr<Oversampling> oversampling;
+  oversimple::OversamplingSettings oversamplingSettings;
+  oversimple::TOversampling<double> wetOversampling;
+  oversimple::TOversampling<double> dryOversampling;
+  oversimple::TOversampling<double> sidechainOversampling;
   std::recursive_mutex oversamplingMutex;
-  OversamplingAttachments<double, std::recursive_mutex> oversamplingAttachments;
+  OversamplingAttachments<std::recursive_mutex> oversamplingAttachments;
 
 public:
   // for gui

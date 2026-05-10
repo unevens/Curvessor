@@ -165,23 +165,28 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 
   , envelopeFollowerSettings(dsp->envelopeFollower)
 
-  , oversamplingSettings([this] {
-    auto oversamplingSettings = OversamplingSettings{};
-    oversamplingSettings.numScalarToVecUpsamplers = 3;
-    oversamplingSettings.numVecToVecDownsamplers = 2;
-    oversamplingSettings.numChannels = 2;
-    oversamplingSettings.updateLatency = [this](int latency) {
-      setLatencySamples(latency);
-    };
-    return oversamplingSettings;
+  , oversamplingSettings([] {
+    auto s = oversimple::OversamplingSettings{};
+    s.numUpSampledChannels = 2;
+    s.numDownSampledChannels = 2;
+    s.upSampleOutputBufferType = oversimple::BufferType::interleaved;
+    s.downSampleInputBufferType = oversimple::BufferType::interleaved;
+    s.downSampleOutputBufferType = oversimple::BufferType::interleaved;
+    s.order = 1;
+    s.isUsingLinearPhase = false;
+    return s;
   }())
 
-  , oversampling(std::make_unique<Oversampling>(oversamplingSettings))
+  , wetOversampling(oversamplingSettings)
+  , dryOversampling(oversamplingSettings)
+  , sidechainOversampling(oversamplingSettings)
 
   , oversamplingAttachments(parameters.oversampling,
                             *parameters.apvts,
                             this,
-                            &oversampling,
+                            &wetOversampling,
+                            &dryOversampling,
+                            &sidechainOversampling,
                             &oversamplingSettings,
                             &oversamplingMutex)
 {
@@ -204,10 +209,13 @@ CurvessorAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
 
   floatToDouble = AudioBuffer<double>(4, samplesPerBlock);
 
-  if (oversamplingSettings.numSamplesPerBlock != samplesPerBlock) {
+  {
     auto const guard = std::lock_guard<std::recursive_mutex>(oversamplingMutex);
-    oversamplingSettings.numSamplesPerBlock = samplesPerBlock;
-    oversampling = std::make_unique<Oversampling>(oversamplingSettings);
+    auto const maxIn = static_cast<uint32_t>(samplesPerBlock);
+    oversamplingSettings.maxNumInputSamples = maxIn;
+    wetOversampling.prepareBuffers(maxIn);
+    dryOversampling.prepareBuffers(maxIn);
+    sidechainOversampling.prepareBuffers(maxIn);
   }
 
   reset();
