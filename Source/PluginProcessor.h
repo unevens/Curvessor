@@ -19,13 +19,12 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 
 #pragma once
 
+#include "CurvessorDsp.h"
 #include "GammaEnvEditor.h"
 #include "Linkables.h"
 #include "OversamplingParameters.h"
 #include "SimpleLookAndFeel.h"
 #include "SplineParameters.h"
-#include "adsp/GammaEnv.hpp"
-#include "adsp/Spline.hpp"
 #include <JuceHeader.h>
 
 #ifndef CURVESSOR_UI_SCALE
@@ -42,8 +41,8 @@ constexpr static long double operator"" _p(long double px)
 class CurvessorAudioProcessor : public AudioProcessor
 {
 public:
-  static constexpr int maxNumKnots = 9;
-  static constexpr int maxEditableKnots = maxNumKnots - 1;
+  static constexpr int maxNumKnots = curvessor::maxNumKnots;
+  static constexpr int maxEditableKnots = curvessor::maxEditableKnots;
 
 private:
   struct Parameters
@@ -71,57 +70,9 @@ private:
 
   Parameters parameters;
 
-  using Spline = adsp::Spline<Vec2d, maxNumKnots>;
-  using AutoSpline = adsp::AutoSpline<Vec2d, maxNumKnots>;
-  using SplineAutomator = adsp::Spline<Vec2d, maxNumKnots>::SmoothingAutomator;
+  aligned_ptr<curvessor::Dsp> dsp;
 
-  struct Dsp
-  {
-    AutoSpline autoSpline;
-
-    adsp::GammaEnv<Vec2d> envelopeFollower;
-
-    double stereoLink[2];
-    double wetAmount[2];
-    double inputGain[2];
-    double outputGain[2];
-    double sidechainInputGain[2];
-    double feedbackBuffer[2];
-    double feedbackAmount[2];
-    double feedbackAmountTarget[2];
-    double rmsAlpha[2];
-    double levelVuMeterBuffer[2];
-    double gainVuMeterBuffer[2];
-    double highPassCoef[2];
-    double highPassState[2];
-    double highPassState2[2];
-    double highPassState3[2];
-    double automationAlpha;
-    double stereoLinkTarget;
-
-    Dsp()
-    {
-      AVEC_ASSERT_ALIGNMENT(this, Vec2d);
-      std::fill_n(stereoLink, 2 * 15, 0.0);
-    }
-
-    void reset(Parameters& parameters);
-
-    template<int highPassOrder>
-    void forwardProcess(VecBuffer<Vec2d>& io,
-                        int const numActiveKnots);
-
-    template<int highPassOrder>
-    void feedbackProcess(VecBuffer<Vec2d>& io,
-                         int const numActiveKnots);
-
-    template<int highPassOrder>
-    void sidechainProcess(VecBuffer<Vec2d>& io,
-                          VecBuffer<Vec2d>& sidechain,
-                          int const numActiveKnots);
-  };
-
-  aligned_ptr<Dsp> dsp;
+  void resetDsp();
 
   adsp::GammaEnvSettings<Vec2d> envelopeFollowerSettings;
 
@@ -158,7 +109,7 @@ public:
   //==============================================================================
   void prepareToPlay(double sampleRate, int samplesPerBlock) override;
   void releaseResources() override;
-  void reset() override { dsp->reset(parameters); }
+  void reset() override { resetDsp(); }
 
 #ifndef JucePlugin_PreferredChannelConfigurations
   bool isBusesLayoutSupported(const BusesLayout& layouts) const override;

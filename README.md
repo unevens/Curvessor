@@ -31,9 +31,49 @@ Curvessor uses the [JUCE](https://github.com/WeAreROLI/JUCE) cross-platform C++ 
 
 You'll need [Projucer](https://shop.juce.com/get-juce) to open the file `Curvessor.jucer` and generate the platform specific builds.
 
+### macOS (Apple Silicon)
+
+The CMake build at the repository root targets macOS. Apple's bundled Clang
+(both Xcode 17's and Command Line Tools 21's) has a NEON-intrinsic codegen
+bug that triggers a frontend bus error when compiling
+`Source/CurvessorDsp.cpp`. The bug is fixed in upstream LLVM, so build with
+**Homebrew Clang 22 or later**:
+
+```
+brew install llvm
+
+cmake -S . -B build \
+  -DCMAKE_BUILD_TYPE=Release \
+  -DCMAKE_C_COMPILER=/opt/homebrew/opt/llvm/bin/clang \
+  -DCMAKE_CXX_COMPILER=/opt/homebrew/opt/llvm/bin/clang++
+
+cmake --build build -j8
+```
+
+`CMakeLists.txt` enforces this — configuring with Apple Clang or any clang
+older than 22 fails immediately with a message pointing at the right
+compiler. It also auto-derives `llvm-ar` / `llvm-ranlib` from the chosen
+compiler's toolchain dir, so you do not need to set `CMAKE_AR` /
+`CMAKE_RANLIB` yourself. (Both are required because LTO is on
+(`juce_recommended_lto_flags`), and the LLVM bitcode object files the
+compiler emits cannot be archived by Apple's `/usr/bin/ar`.)
+
+This builds Standalone, AU, and VST3 to `build/Curvessor_artefacts/Release/`.
+After each successful build, JUCE also copies the AU and VST3 to the standard
+user plugin folders:
+
+- `~/Library/Audio/Plug-Ins/Components/Curvessor 2.1.component`
+- `~/Library/Audio/Plug-Ins/VST3/Curvessor 2.1.vst3`
+
+The Standalone `.app` is not auto-installed (no macOS convention for that) and
+must be run from the build directory or copied manually. To disable the
+auto-install, change `COPY_PLUGIN_AFTER_BUILD TRUE` to `FALSE` in
+`CMakeLists.txt`.
+
 ## Supported platforms
 
-Curvessor is developed and tested on Windows and Linux. It may also work on macOS, but I can neither confirm nor deny.
+Curvessor is developed and tested on Windows and Linux. macOS (Apple Silicon)
+is supported via the CMake build above; see the macOS section.
 
 VST and VST3 binaries are available at https://www.unevens.net/curvessor.html.
 

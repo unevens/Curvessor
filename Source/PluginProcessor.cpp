@@ -161,7 +161,7 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
 
   , parameters(*this)
 
-  , dsp(Aligned<Dsp>::make())
+  , dsp(Aligned<curvessor::Dsp>::make())
 
   , envelopeFollowerSettings(dsp->envelopeFollower)
 
@@ -378,12 +378,12 @@ createPluginFilter()
 }
 
 void
-CurvessorAudioProcessor::Dsp::reset(Parameters& parameters)
+CurvessorAudioProcessor::resetDsp()
 {
-  parameters.spline->updateSpline(autoSpline);
+  parameters.spline->updateSpline(dsp->autoSpline);
 
-  envelopeFollower.reset();
-  autoSpline.reset();
+  dsp->envelopeFollower.reset();
+  dsp->autoSpline.reset();
 
   constexpr double ln10 = 2.30258509299404568402;
   constexpr double db_to_lin = ln10 / 20.0;
@@ -391,14 +391,14 @@ CurvessorAudioProcessor::Dsp::reset(Parameters& parameters)
   double const stereoLinkTarget = 0.01 * parameters.stereoLink->get();
 
   for (int c = 0; c < 2; ++c) {
-    gainVuMeterBuffer[c] = 0.f;
-    levelVuMeterBuffer[c] = -200.0;
-    stereoLink[c] = stereoLinkTarget;
-    inputGain[c] = exp(db_to_lin * parameters.inputGain.get(c)->get());
-    outputGain[c] = exp(db_to_lin * parameters.outputGain.get(c)->get());
-    wetAmount[c] = 0.01 * parameters.wet.get(c)->get();
-    sidechainInputGain[c] = inputGain[c];
-    feedbackAmount[c] = feedbackAmountTarget[c] =
+    dsp->gainVuMeterBuffer[c] = 0.f;
+    dsp->levelVuMeterBuffer[c] = -200.0;
+    dsp->stereoLink[c] = stereoLinkTarget;
+    dsp->inputGain[c] = exp(db_to_lin * parameters.inputGain.get(c)->get());
+    dsp->outputGain[c] = exp(db_to_lin * parameters.outputGain.get(c)->get());
+    dsp->wetAmount[c] = 0.01 * parameters.wet.get(c)->get();
+    dsp->sidechainInputGain[c] = dsp->inputGain[c];
+    dsp->feedbackAmount[c] = dsp->feedbackAmountTarget[c] =
       parameters.feedbackAmount.get(c)->get();
   }
 }
