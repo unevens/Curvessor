@@ -181,14 +181,13 @@ CurvessorAudioProcessor::CurvessorAudioProcessor()
   , dryOversampling(oversamplingSettings)
   , sidechainOversampling(oversamplingSettings)
 
-  , oversamplingAttachments(parameters.oversampling,
-                            *parameters.apvts,
-                            this,
-                            &wetOversampling,
-                            &dryOversampling,
-                            &sidechainOversampling,
-                            &oversamplingSettings,
-                            &oversamplingMutex)
+  , oversamplingAttachments(
+      parameters.oversampling,
+      *parameters.apvts,
+      this,
+      &oversamplingSettings,
+      &oversamplingMutex,
+      { &wetOversampling, &dryOversampling, &sidechainOversampling })
 {
   levelVuMeterResults[0].store(-500.f);
   levelVuMeterResults[1].store(-500.f);

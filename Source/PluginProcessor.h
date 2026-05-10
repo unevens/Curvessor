@@ -20,8 +20,8 @@ along with Curvessor.  If not, see <https://www.gnu.org/licenses/>.
 #pragma once
 
 #include "CurvessorDsp.h"
-#include "CurvessorOversampling.h"
 #include "GammaEnvEditor.h"
+#include "OversamplingAttachments.h"
 #include "Linkables.h"
 #include "SimpleLookAndFeel.h"
 #include "SplineParameters.h"
