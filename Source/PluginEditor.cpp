@@ -25,6 +25,7 @@ constexpr int kDesignWidth = static_cast<int>(1022._p);
 constexpr int kDesignHeight = static_cast<int>(966._p);
 constexpr float kMinScale = 0.5f;
 constexpr float kMaxScale = 2.0f;
+constexpr float kDefaultScale = 0.75f;
 constexpr char const* kEditorWidthProperty = "editorWidth";
 }
 
@@ -360,8 +361,9 @@ CurvessorAudioProcessorEditor::CurvessorAudioProcessorEditor(
   setConstrainer(&constrainer);
 
   auto& state = p.getCurvessorParameters().apvts->state;
+  int const defaultWidth = static_cast<int>(kDesignWidth * kDefaultScale);
   int const savedWidth =
-    static_cast<int>(state.getProperty(kEditorWidthProperty, kDesignWidth));
+    static_cast<int>(state.getProperty(kEditorWidthProperty, defaultWidth));
   int const initialWidth =
     juce::jlimit(static_cast<int>(kDesignWidth * kMinScale),
                  static_cast<int>(kDesignWidth * kMaxScale),
