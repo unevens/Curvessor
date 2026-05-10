@@ -85,9 +85,13 @@ build/release-zip/
 
 The platform suffix becomes `_win` / `_linux` when built on those hosts.
 
-### Windows / Linux
+### Windows
 
-The CMake build is cross-platform via JUCE's `juce_add_plugin`, but the Windows and Linux builds have not been regression-tested since the migration off Projucer. Adapt the `cmake` invocations above for your platform's compiler and report any breakage.
+The CMake build is cross-platform via JUCE's `juce_add_plugin`. Windows is the next platform to be re-validated since the migration off Projucer. Adapt the `cmake` invocations above for MSVC, build, and please report any breakage.
+
+### Linux
+
+The Linux build worked under the old Projucer setup but is not actively tested right now. The CMake setup should be cross-platform via `juce_add_plugin`, but expect to fix things if you build there. PRs welcome.
 
 ## Submodules, libraries, credits
 
