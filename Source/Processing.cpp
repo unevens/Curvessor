@@ -1,5 +1,5 @@
 /*
-Copyright 2020-2021 Dario Mambro
+Copyright 2020-2026 Dario Mambro
 
 This file is part of Curvessor.
 
