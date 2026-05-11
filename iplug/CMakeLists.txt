@@ -17,6 +17,10 @@ set(CURVESSOR_ROOT  "${CMAKE_CURRENT_SOURCE_DIR}/..")
 set(AUDIO_DSP_DIR   "${CURVESSOR_ROOT}/audio-dsp")
 set(OVERSIMPLE_DIR  "${CURVESSOR_ROOT}/oversimple")
 set(CURVESSOR_SRC   "${CURVESSOR_ROOT}/Source")
+# Only juicy/SplineEditorDsp.hpp (a JUCE-free scalar spline evaluator) is
+# used from here. The rest of juicy/ depends on JUCE and must NOT be
+# included from the iPlug2 build.
+set(JUICY_DIR       "${CURVESSOR_ROOT}/juicy")
 
 iplug_add_plugin(${PROJECT_NAME}
   SOURCES
@@ -67,7 +71,8 @@ foreach(_t IN LISTS _curvessor_format_targets)
       ${OVERSIMPLE_DIR}/avec
       ${OVERSIMPLE_DIR}/avec/vectorclass
       ${OVERSIMPLE_DIR}/r8brain
-      ${OVERSIMPLE_DIR}/hiir)
+      ${OVERSIMPLE_DIR}/hiir
+      ${JUICY_DIR})
     target_compile_definitions(${_t} PRIVATE
       PFFFT_ENABLE_DOUBLE=1
       R8B_PFFFT_DOUBLE=1

@@ -3,6 +3,7 @@
 
 #if IPLUG_EDITOR
 #include "IControls.h"
+#include "SplineEditorDsp.hpp"   // juicy::GuiSpline (JUCE-free scalar eval)
 #endif
 
 #include <algorithm>
@@ -111,6 +112,221 @@ oversimple::OversamplingSettings MakeInitialOversamplingSettings()
 }
 
 #endif // IPLUG_DSP
+
+#if IPLUG_EDITOR
+
+// =============================================================================
+// SplineControl — IGraphics control that draws Curvessor's gain-curve and
+// lets the user drag the editable knots. First-pass: knot X/Y only (ignores
+// tangent + smoothness), reads ch0 only, no live level/gain overlay.
+// =============================================================================
+class CurvessorSplineControl final : public IControl
+{
+public:
+  CurvessorSplineControl(const IRECT& bounds)
+  : IControl(bounds)
+  {
+  }
+
+  void Draw(IGraphics& g) override
+  {
+    // Background.
+    g.FillRect(IColor(255, 18, 22, 28), mRECT);
+
+    // Grid (8 divisions on each axis, so each cell is ~12.75 dB).
+    const IColor gridCol(255, 50, 56, 64);
+    constexpr int kGridDivs = 8;
+    for (int i = 1; i < kGridDivs; ++i) {
+      const float t = static_cast<float>(i) / kGridDivs;
+      const float gx = mRECT.L + t * mRECT.W();
+      const float gy = mRECT.B - t * mRECT.H();
+      g.DrawLine(gridCol, gx, mRECT.T, gx, mRECT.B, nullptr, 1.f);
+      g.DrawLine(gridCol, mRECT.L, gy, mRECT.R, gy, nullptr, 1.f);
+    }
+
+    // Refresh scalar spline from the live params and count active knots.
+    const int numActive = RefreshSplineFromParams();
+
+    // Sample curve at N+1 points along the x range and draw as polyline.
+    const IColor curveCol(255, 80, 160, 240);
+    constexpr int kNumSamples = 240;
+    float prevX = 0.f, prevY = 0.f;
+    for (int i = 0; i <= kNumSamples; ++i) {
+      const double xDb = kKnotMin + (kKnotMax - kKnotMin) * (i / double(kNumSamples));
+      const double yDb = mSpline.process(xDb, 0, numActive);
+      const float sx = DbToScreenX(xDb);
+      const float sy = DbToScreenY(yDb);
+      if (i > 0) {
+        g.DrawLine(curveCol, prevX, prevY, sx, sy, nullptr, 2.f);
+      }
+      prevX = sx;
+      prevY = sy;
+    }
+
+    // Knots — only the editable ones the user can grab.
+    auto* del = GetDelegate();
+    const IColor knotCol(255, 255, 200, 80);
+    const IColor knotHotCol(255, 255, 255, 255);
+    for (int i = 0; i < kNumKnots; ++i) {
+      const int base = kKnot1_enabled + i * 10;
+      if (!del->GetParam(base + 0)->Bool()) continue;
+      const float kx = DbToScreenX(del->GetParam(base + 2)->Value());
+      const float ky = DbToScreenY(del->GetParam(base + 3)->Value());
+      const bool hot = (i == mDraggedKnot) || (i == mHoverKnot);
+      g.FillCircle(hot ? knotHotCol : knotCol, kx, ky, kKnotRadius);
+      g.DrawCircle(IColor(255, 0, 0, 0), kx, ky, kKnotRadius, nullptr, 1.f);
+    }
+
+    // Frame around the editor.
+    g.DrawRect(IColor(255, 80, 80, 96), mRECT, nullptr, 1.f);
+  }
+
+  void OnMouseDown(float x, float y, const IMouseMod& mod) override
+  {
+    mDraggedKnot = FindKnotAt(x, y);
+    if (mDraggedKnot >= 0) {
+      const int base = kKnot1_enabled + mDraggedKnot * 10;
+      GetDelegate()->BeginInformHostOfParamChangeFromUI(base + 2);  // X_ch0
+      GetDelegate()->BeginInformHostOfParamChangeFromUI(base + 3);  // Y_ch0
+    }
+    SetDirty(false);
+  }
+
+  void OnMouseDrag(float x, float y, float, float, const IMouseMod&) override
+  {
+    if (mDraggedKnot < 0) return;
+    const int base = kKnot1_enabled + mDraggedKnot * 10;
+    const int xIdx = base + 2;  // X_ch0
+    const int yIdx = base + 3;  // Y_ch0
+
+    auto* del = GetDelegate();
+    const IParam* xParam = del->GetParam(xIdx);
+    const IParam* yParam = del->GetParam(yIdx);
+
+    const double xDb = std::clamp(ScreenXToDb(x), xParam->GetMin(), xParam->GetMax());
+    const double yDb = std::clamp(ScreenYToDb(y), yParam->GetMin(), yParam->GetMax());
+
+    del->SendParameterValueFromUI(xIdx, xParam->ToNormalized(xDb));
+    del->SendParameterValueFromUI(yIdx, yParam->ToNormalized(yDb));
+
+    SetDirty(false);
+  }
+
+  void OnMouseUp(float, float, const IMouseMod&) override
+  {
+    if (mDraggedKnot >= 0) {
+      const int base = kKnot1_enabled + mDraggedKnot * 10;
+      GetDelegate()->EndInformHostOfParamChangeFromUI(base + 2);
+      GetDelegate()->EndInformHostOfParamChangeFromUI(base + 3);
+    }
+    mDraggedKnot = -1;
+    SetDirty(false);
+  }
+
+  void OnMouseOver(float x, float y, const IMouseMod&) override
+  {
+    const int hovered = FindKnotAt(x, y);
+    if (hovered != mHoverKnot) {
+      mHoverKnot = hovered;
+      SetDirty(false);
+    }
+  }
+
+  void OnMouseOut() override
+  {
+    if (mHoverKnot != -1) {
+      mHoverKnot = -1;
+      SetDirty(false);
+    }
+  }
+
+private:
+  static constexpr int kNumKnots = 8;
+  static constexpr double kKnotMin = -96.0;
+  static constexpr double kKnotMax = 6.0;
+  static constexpr float kKnotRadius = 6.f;
+  static constexpr float kKnotHitRadiusSq = 20.f * 20.f;
+
+  juicy::GuiSpline mSpline{ curvessor::maxNumKnots };
+  int mDraggedKnot = -1;
+  int mHoverKnot = -1;
+
+  float DbToScreenX(double db) const
+  {
+    return mRECT.L +
+      static_cast<float>((db - kKnotMin) / (kKnotMax - kKnotMin)) * mRECT.W();
+  }
+  float DbToScreenY(double db) const
+  {
+    return mRECT.B -
+      static_cast<float>((db - kKnotMin) / (kKnotMax - kKnotMin)) * mRECT.H();
+  }
+  double ScreenXToDb(float x) const
+  {
+    return kKnotMin +
+      (x - mRECT.L) / static_cast<double>(mRECT.W()) * (kKnotMax - kKnotMin);
+  }
+  double ScreenYToDb(float y) const
+  {
+    return kKnotMin +
+      (mRECT.B - y) / static_cast<double>(mRECT.H()) * (kKnotMax - kKnotMin);
+  }
+
+  int FindKnotAt(float x, float y)
+  {
+    auto* del = GetDelegate();
+    int best = -1;
+    float bestDist2 = kKnotHitRadiusSq;
+    for (int i = 0; i < kNumKnots; ++i) {
+      const int base = kKnot1_enabled + i * 10;
+      if (!del->GetParam(base + 0)->Bool()) continue;
+      const float kx = DbToScreenX(del->GetParam(base + 2)->Value());
+      const float ky = DbToScreenY(del->GetParam(base + 3)->Value());
+      const float dx = kx - x;
+      const float dy = ky - y;
+      const float d2 = dx * dx + dy * dy;
+      if (d2 < bestDist2) {
+        bestDist2 = d2;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  // Populates mSpline from the live param values. Returns count of active
+  // knots (fixed anchor + each enabled editable knot). Mirrors the
+  // ProcessBlock-side UpdateSplineFromParams helper, but for one channel.
+  int RefreshSplineFromParams()
+  {
+    auto* del = GetDelegate();
+    int n = 0;
+    // Fixed bottom-left anchor.
+    for (int c = 0; c < 2; ++c) {
+      mSpline.knot(n).x[c] = -96.0;
+      mSpline.knot(n).y[c] = -96.0;
+      mSpline.knot(n).t[c] = 1.0;
+      mSpline.knot(n).s[c] = 1.0;
+    }
+    ++n;
+    for (int i = 0; i < kNumKnots; ++i) {
+      const int base = kKnot1_enabled + i * 10;
+      if (!del->GetParam(base + 0)->Bool()) continue;
+      const bool linked = del->GetParam(base + 1)->Bool();
+      for (int c = 0; c < 2; ++c) {
+        const int chSrc = linked ? 0 : c;
+        const int chBase = base + 2 + chSrc * 4;
+        mSpline.knot(n).x[c] = del->GetParam(chBase + 0)->Value();
+        mSpline.knot(n).y[c] = del->GetParam(chBase + 1)->Value();
+        mSpline.knot(n).t[c] = del->GetParam(chBase + 2)->Value();
+        mSpline.knot(n).s[c] = del->GetParam(chBase + 3)->Value();
+      }
+      ++n;
+    }
+    return n;
+  }
+};
+
+#endif // IPLUG_EDITOR
 
 } // namespace
 
@@ -236,6 +452,9 @@ Curvessor::Curvessor(const InstanceInfo& info)
     const IRECT innerBounds = bounds.GetPadded(-10.f);
     const IRECT titleBounds = innerBounds.GetFromTop(40).GetCentredInside(560, 36);
     const IRECT versionBounds = innerBounds.GetFromTRHC(300, 20);
+    // Big spline editor between title and the param grid.
+    const IRECT splineEditorRect =
+      innerBounds.GetReducedFromTop(50).GetFromTop(300).GetCentredInside(720, 300);
     const IRECT metersArea = innerBounds.GetFromBottom(90).GetPadded(-5);
     const IRECT levelMeterRect = metersArea.GetFromLeft(metersArea.W() * 0.5f).GetPadded(-4);
     const IRECT gainMeterRect  = metersArea.GetFromRight(metersArea.W() * 0.5f).GetPadded(-4);
@@ -244,6 +463,7 @@ Curvessor::Curvessor(const InstanceInfo& info)
       pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(bounds);
       pGraphics->GetControlWithTag(kCtrlTagTitle)->SetTargetAndDrawRECTs(titleBounds);
       pGraphics->GetControlWithTag(kCtrlTagVersionNumber)->SetTargetAndDrawRECTs(versionBounds);
+      pGraphics->GetControlWithTag(kCtrlTagSplineEditor)->SetTargetAndDrawRECTs(splineEditorRect);
       pGraphics->GetControlWithTag(kCtrlTagLevelMeter)->SetTargetAndDrawRECTs(levelMeterRect);
       pGraphics->GetControlWithTag(kCtrlTagGainMeter)->SetTargetAndDrawRECTs(gainMeterRect);
       return;
@@ -263,8 +483,14 @@ Curvessor::Curvessor(const InstanceInfo& info)
                        DEFAULT_TEXT.WithAlign(EAlign::Far)),
       kCtrlTagVersionNumber);
 
-    // Param grid sits between title and meters. 6 cols × 3 rows.
-    const IRECT gridArea = innerBounds.GetReducedFromTop(60).GetReducedFromBottom(100);
+    // Spline curve editor — drag the editable knots to shape the gain curve.
+    pGraphics->AttachControl(
+      new CurvessorSplineControl(splineEditorRect),
+      kCtrlTagSplineEditor);
+
+    // Param grid sits between the spline editor and meters. 6 cols × 3 rows.
+    const IRECT gridArea =
+      innerBounds.GetReducedFromTop(360).GetReducedFromBottom(100);
     constexpr int kGridCols = 6;
     constexpr int kGridRows = 3;
     auto cellAt = [&](int col, int row) {

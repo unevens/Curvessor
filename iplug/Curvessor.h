@@ -81,6 +81,7 @@ enum ECtrlTags
   kCtrlTagVersionNumber,
   kCtrlTagLevelMeter,
   kCtrlTagGainMeter,
+  kCtrlTagSplineEditor,
 };
 
 using namespace iplug;
