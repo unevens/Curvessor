@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AudioComponents</key>
+	<array>
+		<dict>
+			<key>description</key>
+			<string>Curvessor</string>
+			<key>factoryFunction</key>
+			<string>Curvessor_Factory</string>
+			<key>manufacturer</key>
+			<string>UnEv</string>
+			<key>name</key>
+			<string>unevens: Curvessor</string>
+			<key>sandboxSafe</key>
+			<true/>
+			<key>subtype</key>
+			<string>CrvI</string>
+			<key>type</key>
+			<string>aufx</string>
+			<key>version</key>
+			<integer>0</integer>
+		</dict>
+	</array>
+	<key>AudioUnit Version</key>
+	<string>0x00000100</string>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>English</string>
+	<key>CFBundleExecutable</key>
+	<string>Curvessor</string>
+	<key>CFBundleGetInfoString</key>
+	<string>Curvessor v0.1.0 Copyright Dario Mambro 2020-2026</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.unevens.audiounit.Curvessor</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>Curvessor</string>
+	<key>CFBundlePackageType</key>
+	<string>BNDL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1.0</string>
+	<key>CFBundleSignature</key>
+	<string>CrvI</string>
+	<key>CFBundleVersion</key>
+	<string>0.1.0</string>
+	<key>CSResourcesFileMapped</key>
+	<true/>
+	<key>LSMinimumSystemVersion</key>
+	<string>10.13.0</string>
+	<key>NSPrincipalClass</key>
+	<string>Curvessor_View</string>
+</dict>
+</plist>
