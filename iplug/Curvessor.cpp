@@ -212,6 +212,20 @@ Curvessor::Curvessor(const InstanceInfo& info)
   mGainVuMeterResults[1].store(0.f);
 #endif
 
+  // Initialize the single preset so it survives PruneUninitializedPresets in
+  // the AU entry point, giving hosts a real preset name ("Default") instead
+  // of an empty slot. Must come after all params are Init'd —
+  // MakeDefaultPreset captures their current values into the preset's chunk
+  // via SerializeState.
+  //
+  // Note: this does NOT silence auval's "Preset name is not retained in
+  // retrieved class data" warning. That warning fires because iPlug2's
+  // SetState in IPlugAU.cpp:1492 looks up presets by exact name and silently
+  // no-ops when auval modifies the name in the saved class data. The
+  // workaround would be an override of OnRestoreState / SetState — out of
+  // scope for this port pass.
+  MakeDefaultPreset("Default", kNumPresets);
+
 #if IPLUG_EDITOR
   mMakeGraphicsFunc = [&]() {
     return MakeGraphics(*this, PLUG_WIDTH, PLUG_HEIGHT, PLUG_FPS);
