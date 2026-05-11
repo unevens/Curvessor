@@ -237,12 +237,15 @@ target_link_libraries(Curvessor
 # Release-zip staging + zipping.
 #
 # `cmake --build build --target package-zip` produces, in build/release-zip/:
-#   Curvessor2.1_<platform>/      — AU bundle, VST3 bundle, legal/, README.txt
+#   Curvessor2.1_<platform>/      — plug-in bundle(s), legal/, README.txt
 #   Curvessor2.1_<platform>.zip   — the same folder, zipped, ready to upload
-# where <platform> is mac / win / linux depending on the build host.
+# Bundles packaged per platform:
+#   mac:   AU (.component) + VST3 (.vst3)
+#   win:   VST3 (.vst3)
+#   linux: VST3 (.vst3)
 #
-# For a real release, configure with -DUNIVERSAL=ON so the bundles run on
-# both Apple Silicon and Intel.
+# For a real release on macOS, configure with -DUNIVERSAL=ON so the bundles
+# run on both Apple Silicon and Intel.
 if(APPLE)
     set(_curvessor_platform_suffix "mac")
 elseif(WIN32)
@@ -257,23 +260,60 @@ set(_curvessor_zip_basename "Curvessor2.1_${_curvessor_platform_suffix}")
 set(_curvessor_zip_stage
     "${CMAKE_BINARY_DIR}/release-zip/${_curvessor_zip_basename}")
 
+# Pick the right README per host. Mac and Linux share README.txt; Windows
+# has its own (different install paths, Mark-of-the-Web unblock instead of
+# xattr quarantine). The file is renamed to README.txt inside the zip.
+if(WIN32)
+    set(_curvessor_readme_src "${CMAKE_CURRENT_LIST_DIR}/README_win.txt")
+else()
+    set(_curvessor_readme_src "${CMAKE_CURRENT_LIST_DIR}/README.txt")
+endif()
+
+# Per-platform: parallel lists of bundle targets and their destination
+# basenames inside the zip, plus the DEPENDS list. JUCE_PLUGIN_ARTEFACT_FILE
+# resolves to the bundle dir on every platform (it's $<TARGET_BUNDLE_DIR> on
+# macOS and the .vst3 directory on Win/Linux), so we don't have to branch on
+# the generator expression itself.
+set(_curvessor_zip_targets "")
+set(_curvessor_zip_dests   "")
+set(_curvessor_zip_depends Curvessor_VST3)
+if(APPLE)
+    list(APPEND _curvessor_zip_targets Curvessor_AU)
+    list(APPEND _curvessor_zip_dests   "Curvessor 2.1.component")
+    list(APPEND _curvessor_zip_depends Curvessor_AU)
+endif()
+list(APPEND _curvessor_zip_targets Curvessor_VST3)
+list(APPEND _curvessor_zip_dests   "Curvessor 2.1.vst3")
+
+set(_curvessor_zip_copy_commands "")
+list(LENGTH _curvessor_zip_targets _curvessor_zip_count)
+math(EXPR _curvessor_zip_last "${_curvessor_zip_count} - 1")
+foreach(_i RANGE 0 ${_curvessor_zip_last})
+    list(GET _curvessor_zip_targets ${_i} _bundle_target)
+    list(GET _curvessor_zip_dests   ${_i} _bundle_dest)
+    # JUCE_PLUGIN_ARTEFACT_FILE is itself a string containing generator
+    # expressions; we read it here so CMake evaluates its embedded genex
+    # when the custom-command's COMMAND line is generated.
+    get_target_property(_bundle_src "${_bundle_target}" JUCE_PLUGIN_ARTEFACT_FILE)
+    list(APPEND _curvessor_zip_copy_commands
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${_bundle_src}"
+            "${_curvessor_zip_stage}/${_bundle_dest}")
+endforeach()
+
 add_custom_target(package-zip
     COMMAND ${CMAKE_COMMAND} -E rm -rf "${CMAKE_BINARY_DIR}/release-zip"
     COMMAND ${CMAKE_COMMAND} -E make_directory "${_curvessor_zip_stage}"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "$<TARGET_BUNDLE_DIR:Curvessor_AU>"
-        "${_curvessor_zip_stage}/Curvessor 2.1.component"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-        "$<TARGET_BUNDLE_DIR:Curvessor_VST3>"
-        "${_curvessor_zip_stage}/Curvessor 2.1.vst3"
+    ${_curvessor_zip_copy_commands}
     COMMAND ${CMAKE_COMMAND} -E copy_directory
         "${CMAKE_CURRENT_LIST_DIR}/legal"
         "${_curvessor_zip_stage}/legal"
     COMMAND ${CMAKE_COMMAND} -E copy
-        "${CMAKE_CURRENT_LIST_DIR}/README.txt"
+        "${_curvessor_readme_src}"
         "${_curvessor_zip_stage}/README.txt"
     COMMAND ${CMAKE_COMMAND} -E chdir "${CMAKE_BINARY_DIR}/release-zip"
-        zip -rq "${_curvessor_zip_basename}.zip" "${_curvessor_zip_basename}"
-    DEPENDS Curvessor_AU Curvessor_VST3
+        ${CMAKE_COMMAND} -E tar cf "${_curvessor_zip_basename}.zip"
+            --format=zip "${_curvessor_zip_basename}"
+    DEPENDS ${_curvessor_zip_depends}
     COMMENT "Building ${_curvessor_zip_basename}.zip in ${CMAKE_BINARY_DIR}/release-zip"
     VERBATIM)
