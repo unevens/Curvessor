@@ -7,3 +7,6 @@
 [submodule "audio-dsp"]
 	path = audio-dsp
 	url = https://github.com/unevens/audio-dsp
+[submodule "JUCE"]
+	path = JUCE
+	url = https://github.com/juce-framework/JUCE.git
