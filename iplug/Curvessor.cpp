@@ -347,6 +347,12 @@ void Curvessor::OnReset()
   mDryBuffer.setNumSamples(blockSize);
   mSidechainScratch.setNumSamples(blockSize);
 
+  // Always report the current latency on reset — covers the case where
+  // EnsureOversamplingCurrent above early-returned because the cached
+  // last-applied settings happened to match the current params (typical
+  // on first launch).
+  SetLatency(static_cast<int>(mWetOversampling.getLatency()));
+
   // Reset DSP state and seed gain ramps from the current parameter values.
   // Mirrors CurvessorAudioProcessor::resetDsp().
   UpdateSplineFromParams();
@@ -438,6 +444,14 @@ void Curvessor::EnsureOversamplingCurrent()
 
   mLastOversamplingOrder = order;
   mLastOversamplingLinearPhase = linPhase;
+
+  // Report the new latency so the host can do PDC. Linear-phase FIR
+  // oversampling adds substantial latency; minimum-phase IIR reports 0
+  // (group delay isn't constant so iPlug2 can't expose it as a single
+  // sample count). The per-format SetLatency override notifies the host:
+  // VST3 calls restartComponent(kLatencyChanged), CLAP defers via
+  // runOnMainThread, AU informs its listeners.
+  SetLatency(static_cast<int>(mWetOversampling.getLatency()));
 }
 
 // =============================================================================
