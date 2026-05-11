@@ -177,11 +177,11 @@ Curvessor::Curvessor(const InstanceInfo& info)
   mLayoutFunc = [&](IGraphics* pGraphics) {
     const IRECT bounds = pGraphics->GetBounds();
     const IRECT innerBounds = bounds.GetPadded(-10.f);
+    const IRECT titleBounds = innerBounds.GetFromTop(40).GetCentredInside(560, 36);
     const IRECT versionBounds = innerBounds.GetFromTRHC(300, 20);
-    const IRECT titleBounds = innerBounds.GetCentredInside(500, 40).GetVShifted(-220);
-    const IRECT metersArea = innerBounds.GetCentredInside(900, 80).GetVShifted(200);
-    const IRECT levelMeterRect = metersArea.GetFromLeft(metersArea.W() * 0.5f).GetPadded(-8);
-    const IRECT gainMeterRect  = metersArea.GetFromRight(metersArea.W() * 0.5f).GetPadded(-8);
+    const IRECT metersArea = innerBounds.GetFromBottom(90).GetPadded(-5);
+    const IRECT levelMeterRect = metersArea.GetFromLeft(metersArea.W() * 0.5f).GetPadded(-4);
+    const IRECT gainMeterRect  = metersArea.GetFromRight(metersArea.W() * 0.5f).GetPadded(-4);
 
     if (pGraphics->NControls()) {
       pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(bounds);
@@ -197,7 +197,7 @@ Curvessor::Curvessor(const InstanceInfo& info)
     pGraphics->LoadFont("Roboto-Regular", ROBOTO_FN);
     pGraphics->AttachPanelBackground(COLOR_LIGHT_GRAY);
     pGraphics->AttachControl(
-      new ITextControl(titleBounds, "Curvessor (iPlug2 port — placeholder UI)", IText(24)),
+      new ITextControl(titleBounds, "Curvessor (iPlug2 port — placeholder UI)", IText(22)),
       kCtrlTagTitle);
     WDL_String buildInfoStr;
     GetBuildInfoStr(buildInfoStr, __DATE__, __TIME__);
@@ -206,27 +206,53 @@ Curvessor::Curvessor(const InstanceInfo& info)
                        DEFAULT_TEXT.WithAlign(EAlign::Far)),
       kCtrlTagVersionNumber);
 
-    // A small grid of stock controls so a handful of params are reachable from
-    // the GUI for smoke-testing. The real UI port comes later.
-    const IRECT controlsArea = innerBounds.GetCentredInside(900, 320).GetVShifted(20);
-    const int kCols = 4, kRows = 2;
-    const float colW = controlsArea.W() / kCols;
-    const float rowH = controlsArea.H() / kRows;
+    // Param grid sits between title and meters. 6 cols × 3 rows.
+    const IRECT gridArea = innerBounds.GetReducedFromTop(60).GetReducedFromBottom(100);
+    constexpr int kGridCols = 6;
+    constexpr int kGridRows = 3;
     auto cellAt = [&](int col, int row) {
-      return IRECT(controlsArea.L + col * colW,
-                   controlsArea.T + row * rowH,
-                   controlsArea.L + (col + 1) * colW,
-                   controlsArea.T + (row + 1) * rowH).GetPadded(-8);
+      const float colW = gridArea.W() / kGridCols;
+      const float rowH = gridArea.H() / kGridRows;
+      return IRECT(gridArea.L + col * colW, gridArea.T + row * rowH,
+                   gridArea.L + (col + 1) * colW, gridArea.T + (row + 1) * rowH).GetPadded(-6);
     };
 
-    pGraphics->AttachControl(new IVKnobControl(cellAt(0, 0), kInputGain_ch0, "In L"));
-    pGraphics->AttachControl(new IVKnobControl(cellAt(1, 0), kInputGain_ch1, "In R"));
-    pGraphics->AttachControl(new IVKnobControl(cellAt(2, 0), kOutputGain_ch0, "Out L"));
-    pGraphics->AttachControl(new IVKnobControl(cellAt(3, 0), kOutputGain_ch1, "Out R"));
-    pGraphics->AttachControl(new IVKnobControl(cellAt(0, 1), kAttack_ch0, "Attack"));
-    pGraphics->AttachControl(new IVKnobControl(cellAt(1, 1), kRelease_ch0, "Release"));
-    pGraphics->AttachControl(new IVSwitchControl(cellAt(2, 1), kMidSide, "Mid-Side"));
-    pGraphics->AttachControl(new IVSwitchControl(cellAt(3, 1), kSideChain, "Sidechain"));
+    // A linkable pair shows up as a knob on ch0 plus a small "L" toggle bound
+    // to the _is_linked bool. The DSP reads ch1 from ch0 whenever linked is
+    // true (see GetLinkable).
+    auto attachLinkable = [&](const IRECT& cell, int ch0Idx, const char* label) {
+      const IRECT knobRect = cell.GetReducedFromRight(28);
+      const IRECT linkRect = cell.GetFromRight(24).GetPadded(0, -10, 0, -10);
+      pGraphics->AttachControl(new IVKnobControl(knobRect, ch0Idx, label));
+      pGraphics->AttachControl(new IVSwitchControl(linkRect, ch0Idx + 2, "L"));
+    };
+
+    // Row 0 — globals.
+    pGraphics->AttachControl(new IVSwitchControl(cellAt(0, 0), kMidSide, "Mid-Side"));
+    pGraphics->AttachControl(new IVSwitchControl(cellAt(1, 0), kSideChain, "Sidechain"));
+    pGraphics->AttachControl(new IVTabSwitchControl(cellAt(2, 0), kOversampling,
+                              {"1x", "2x", "4x", "8x", "16x", "32x"}, "Oversampling"));
+    pGraphics->AttachControl(new IVSwitchControl(cellAt(3, 0), kLinearPhaseOversampling, "Lin Phase"));
+    pGraphics->AttachControl(new IVKnobControl(cellAt(4, 0), kStereoLink, "Stereo Link"));
+    pGraphics->AttachControl(new IVKnobControl(cellAt(5, 0), kSmoothingTime, "Smoothing"));
+
+    // Row 1 — input/output gain, wet, feedback, attack, release.
+    attachLinkable(cellAt(0, 1), kInputGain_ch0,      "In Gain");
+    attachLinkable(cellAt(1, 1), kOutputGain_ch0,     "Out Gain");
+    attachLinkable(cellAt(2, 1), kWet_ch0,            "Wet");
+    attachLinkable(cellAt(3, 1), kFeedbackAmount_ch0, "Feedback");
+    attachLinkable(cellAt(4, 1), kAttack_ch0,         "Attack");
+    attachLinkable(cellAt(5, 1), kRelease_ch0,        "Release");
+
+    // Row 2 — delays, RMS, high-pass.
+    attachLinkable(cellAt(0, 2), kAttackDelay_ch0,    "A Delay");
+    attachLinkable(cellAt(1, 2), kReleaseDelay_ch0,   "R Delay");
+    attachLinkable(cellAt(2, 2), kRMSTime_ch0,        "RMS Time");
+    attachLinkable(cellAt(3, 2), kHighPassCutoff_ch0, "HP Cutoff");
+    pGraphics->AttachControl(new IVTabSwitchControl(cellAt(4, 2), kHighPassOrder,
+                              {"Off", "6", "12", "18"}, "HP Order"));
+    // cellAt(5, 2) intentionally empty — leaves room for a future "HP type" or
+    // similar control without re-laying out the grid.
 
     // VU meters fed by ISender packets pushed from ProcessBlock.
     pGraphics->AttachControl(
