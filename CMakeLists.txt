@@ -1,6 +1,22 @@
 cmake_minimum_required(VERSION 3.25)
 project(Curvessor VERSION 2.1.0 LANGUAGES C CXX)
 
+# Universal arm64+x86_64 on macOS. OFF by default for now: an avec / macOS-SDK
+# collision blocks the x86_64 slice in the iPlug2 build. IControls.h pulls in
+# <MacTypes.h> via Cocoa headers, whose anonymous-enum value `extend` (= 0x40)
+# clashes at global scope with vectorclass's `extend()` SIMD functions when
+# compiling for x86_64 through avec. The JUCE side dodges this because JUCE's
+# headers don't pull Cocoa/CoreFoundation into pure-C++ TUs. Proper fix: patch
+# avec to honour VCL_NAMESPACE so vectorclass symbols don't live in the global
+# namespace. Until then this defaults OFF — Apple Silicon users only — and
+# you can opt in with -DUNIVERSAL=ON to confirm/iterate on the fix.
+if(APPLE)
+    option(UNIVERSAL "Build a universal arm64+x86_64 binary on macOS" OFF)
+    if(UNIVERSAL)
+        set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "" FORCE)
+    endif()
+endif()
+
 # macOS arm64 toolchain preflight (carried over from the JUCE build).
 #
 # Apple Clang (Xcode 17, CLT 21) and pre-22 upstream Clang have a NEON
