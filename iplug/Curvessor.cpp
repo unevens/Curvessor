@@ -54,6 +54,49 @@ void ApplyGain(double** io,
   }
 }
 
+// Symmetric skew shape — matches JUCE's NormalisableRange skewFactor with
+// symmetricSkew=true. The midpoint is at normalized=0.5; both halves use
+// |d|^(1/skewFactor) so smaller skewFactor → more slider real estate near
+// the midpoint.
+//
+// JUCE convertFrom0to1 reference (symmetric branch):
+//   d = 2 * normalized - 1
+//   value = mid + halfRange * sign(d) * pow(|d|, 1 / skewFactor)
+struct ShapeSymmetricSkew : public IParam::Shape
+{
+  explicit ShapeSymmetricSkew(double skewFactor) : mSkewFactor(skewFactor) {}
+
+  Shape* Clone() const override { return new ShapeSymmetricSkew(*this); }
+  IParam::EDisplayType GetDisplayType() const override { return IParam::kDisplayLinear; }
+
+  double NormalizedToValue(double normalized, const IParam& param) const override
+  {
+    const double min = param.GetMin();
+    const double max = param.GetMax();
+    const double mid = 0.5 * (min + max);
+    const double halfRange = 0.5 * (max - min);
+    const double d = 2.0 * normalized - 1.0;
+    const double sign = (d < 0.0) ? -1.0 : 1.0;
+    const double skewed = sign * std::pow(std::abs(d), 1.0 / mSkewFactor);
+    return mid + halfRange * skewed;
+  }
+
+  double ValueToNormalized(double value, const IParam& param) const override
+  {
+    const double min = param.GetMin();
+    const double max = param.GetMax();
+    const double mid = 0.5 * (min + max);
+    const double halfRange = 0.5 * (max - min);
+    if (halfRange == 0.0) return 0.5;
+    const double d = (value - mid) / halfRange;
+    const double sign = (d < 0.0) ? -1.0 : 1.0;
+    const double skewed = sign * std::pow(std::abs(d), mSkewFactor);
+    return 0.5 * (skewed + 1.0);
+  }
+
+  double mSkewFactor;
+};
+
 oversimple::OversamplingSettings MakeInitialOversamplingSettings()
 {
   oversimple::OversamplingSettings s;
@@ -99,8 +142,8 @@ Curvessor::Curvessor(const InstanceInfo& info)
 
   // ---------- Linkable float pairs ----------
   // ShapePowCurve(4.0) matches JUCE's skewFactor=0.25 (asymmetric, dense at
-  // the bottom). Input/Output gain use JUCE's symmetric skew which has no
-  // built-in iPlug2 equivalent — left linear for now.
+  // the bottom). Input/Output gain use ShapeSymmetricSkew(0.25) — defined
+  // above; mid-point-dense, both extremes sparse.
   auto initLinkable = [this](int ch0Idx, const char* baseName,
                              double def, double min, double max, double step,
                              const char* unit,
@@ -114,8 +157,8 @@ Curvessor::Curvessor(const InstanceInfo& info)
     GetParam(ch0Idx + 2)->InitBool(buf, true);
   };
 
-  initLinkable(kInputGain_ch0,      "Input-Gain",          0.0, -48.0,   48.0, 0.01, "dB");
-  initLinkable(kOutputGain_ch0,     "Output-Gain",         0.0, -48.0,   48.0, 0.01, "dB");
+  initLinkable(kInputGain_ch0,      "Input-Gain",          0.0, -48.0,   48.0, 0.01, "dB", ShapeSymmetricSkew(0.25));
+  initLinkable(kOutputGain_ch0,     "Output-Gain",         0.0, -48.0,   48.0, 0.01, "dB", ShapeSymmetricSkew(0.25));
   initLinkable(kWet_ch0,            "Wet",               100.0,   0.0,  100.0, 1.0,  "%");
   initLinkable(kFeedbackAmount_ch0, "Feedback-Amount",     0.0,   0.0,  100.0, 1.0,  "%");
   initLinkable(kAttack_ch0,         "Attack",             20.0,   0.05, 2000.0, 0.01, "ms", IParam::ShapePowCurve(4.0));
