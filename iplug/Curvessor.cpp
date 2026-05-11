@@ -98,16 +98,18 @@ Curvessor::Curvessor(const InstanceInfo& info)
     {"Disabled", "6dB/Oct", "12db/Oct", "18dB/Oct"});
 
   // ---------- Linkable float pairs ----------
-  // TODO: JUCE-side skew factors (0.25, symmetric for gains) are dropped here;
-  // restore via ShapePowCurve when shaping is tuned.
+  // ShapePowCurve(4.0) matches JUCE's skewFactor=0.25 (asymmetric, dense at
+  // the bottom). Input/Output gain use JUCE's symmetric skew which has no
+  // built-in iPlug2 equivalent — left linear for now.
   auto initLinkable = [this](int ch0Idx, const char* baseName,
                              double def, double min, double max, double step,
-                             const char* unit) {
+                             const char* unit,
+                             const IParam::Shape& shape = IParam::ShapeLinear()) {
     char buf[64];
     std::snprintf(buf, sizeof(buf), "%s_ch0", baseName);
-    GetParam(ch0Idx + 0)->InitDouble(buf, def, min, max, step, unit);
+    GetParam(ch0Idx + 0)->InitDouble(buf, def, min, max, step, unit, 0, "", shape);
     std::snprintf(buf, sizeof(buf), "%s_ch1", baseName);
-    GetParam(ch0Idx + 1)->InitDouble(buf, def, min, max, step, unit);
+    GetParam(ch0Idx + 1)->InitDouble(buf, def, min, max, step, unit, 0, "", shape);
     std::snprintf(buf, sizeof(buf), "%s_is_linked", baseName);
     GetParam(ch0Idx + 2)->InitBool(buf, true);
   };
@@ -116,11 +118,11 @@ Curvessor::Curvessor(const InstanceInfo& info)
   initLinkable(kOutputGain_ch0,     "Output-Gain",         0.0, -48.0,   48.0, 0.01, "dB");
   initLinkable(kWet_ch0,            "Wet",               100.0,   0.0,  100.0, 1.0,  "%");
   initLinkable(kFeedbackAmount_ch0, "Feedback-Amount",     0.0,   0.0,  100.0, 1.0,  "%");
-  initLinkable(kAttack_ch0,         "Attack",             20.0,   0.05, 2000.0, 0.01, "ms");
-  initLinkable(kRelease_ch0,        "Release",           200.0,   1.0,  2000.0, 0.01, "ms");
+  initLinkable(kAttack_ch0,         "Attack",             20.0,   0.05, 2000.0, 0.01, "ms", IParam::ShapePowCurve(4.0));
+  initLinkable(kRelease_ch0,        "Release",           200.0,   1.0,  2000.0, 0.01, "ms", IParam::ShapePowCurve(4.0));
   initLinkable(kAttackDelay_ch0,    "Attack-Delay",        0.0,   0.0,    25.0, 0.01, "ms");
   initLinkable(kReleaseDelay_ch0,   "Release-Delay",       0.0,   0.0,    25.0, 0.01, "ms");
-  initLinkable(kRMSTime_ch0,        "RMS-Time",            0.0,   0.0,  1000.0, 0.01, "ms");
+  initLinkable(kRMSTime_ch0,        "RMS-Time",            0.0,   0.0,  1000.0, 0.01, "ms", IParam::ShapePowCurve(4.0));
   initLinkable(kHighPassCutoff_ch0, "High-Pass-Cutoff",  100.0,  10.0,   250.0, 0.01, "Hz");
 
   // ---------- Spline knots ----------
@@ -177,11 +179,16 @@ Curvessor::Curvessor(const InstanceInfo& info)
     const IRECT innerBounds = bounds.GetPadded(-10.f);
     const IRECT versionBounds = innerBounds.GetFromTRHC(300, 20);
     const IRECT titleBounds = innerBounds.GetCentredInside(500, 40).GetVShifted(-220);
+    const IRECT metersArea = innerBounds.GetCentredInside(900, 80).GetVShifted(200);
+    const IRECT levelMeterRect = metersArea.GetFromLeft(metersArea.W() * 0.5f).GetPadded(-8);
+    const IRECT gainMeterRect  = metersArea.GetFromRight(metersArea.W() * 0.5f).GetPadded(-8);
 
     if (pGraphics->NControls()) {
       pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(bounds);
       pGraphics->GetControlWithTag(kCtrlTagTitle)->SetTargetAndDrawRECTs(titleBounds);
       pGraphics->GetControlWithTag(kCtrlTagVersionNumber)->SetTargetAndDrawRECTs(versionBounds);
+      pGraphics->GetControlWithTag(kCtrlTagLevelMeter)->SetTargetAndDrawRECTs(levelMeterRect);
+      pGraphics->GetControlWithTag(kCtrlTagGainMeter)->SetTargetAndDrawRECTs(gainMeterRect);
       return;
     }
 
@@ -220,6 +227,18 @@ Curvessor::Curvessor(const InstanceInfo& info)
     pGraphics->AttachControl(new IVKnobControl(cellAt(1, 1), kRelease_ch0, "Release"));
     pGraphics->AttachControl(new IVSwitchControl(cellAt(2, 1), kMidSide, "Mid-Side"));
     pGraphics->AttachControl(new IVSwitchControl(cellAt(3, 1), kSideChain, "Sidechain"));
+
+    // VU meters fed by ISender packets pushed from ProcessBlock.
+    pGraphics->AttachControl(
+      new IVMeterControl<2>(levelMeterRect, "Level (dB)", DEFAULT_STYLE,
+                            EDirection::Horizontal, {"L", "R"}, 0,
+                            IVMeterControl<2>::EResponse::Log, -60.f, 6.f),
+      kCtrlTagLevelMeter);
+    pGraphics->AttachControl(
+      new IVMeterControl<2>(gainMeterRect, "Gain (dB)", DEFAULT_STYLE,
+                            EDirection::Horizontal, {"L", "R"}, 0,
+                            IVMeterControl<2>::EResponse::Log, -60.f, 6.f),
+      kCtrlTagGainMeter);
   };
 #endif
 }
@@ -243,6 +262,7 @@ void Curvessor::OnReset()
   }
 
   mDryBuffer.setNumSamples(blockSize);
+  mSidechainScratch.setNumSamples(blockSize);
 
   // Reset DSP state and seed gain ramps from the current parameter values.
   // Mirrors CurvessorAudioProcessor::resetDsp().
@@ -256,12 +276,12 @@ void Curvessor::OnReset()
     mDsp->gainVuMeterBuffer[c] = 0.0;
     mDsp->levelVuMeterBuffer[c] = -200.0;
     mDsp->stereoLink[c] = stereoLinkTarget;
-    mDsp->inputGain[c]  = std::exp(kDbToLin * GetParam(kInputGain_ch0 + c)->Value());
-    mDsp->outputGain[c] = std::exp(kDbToLin * GetParam(kOutputGain_ch0 + c)->Value());
-    mDsp->wetAmount[c]  = 0.01 * GetParam(kWet_ch0 + c)->Value();
+    mDsp->inputGain[c]  = std::exp(kDbToLin * GetLinkable(kInputGain_ch0, c));
+    mDsp->outputGain[c] = std::exp(kDbToLin * GetLinkable(kOutputGain_ch0, c));
+    mDsp->wetAmount[c]  = 0.01 * GetLinkable(kWet_ch0, c);
     mDsp->sidechainInputGain[c] = mDsp->inputGain[c];
     mDsp->feedbackAmount[c] = mDsp->feedbackAmountTarget[c] =
-      GetParam(kFeedbackAmount_ch0 + c)->Value();
+      GetLinkable(kFeedbackAmount_ch0, c);
   }
 }
 
@@ -389,24 +409,24 @@ void Curvessor::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   double wetAmountTarget[2];
 
   for (int c = 0; c < 2; ++c) {
-    inputGainTarget[c]  = std::exp(kDbToLin * GetParam(kInputGain_ch0 + c)->Value());
-    outputGainTarget[c] = std::exp(kDbToLin * GetParam(kOutputGain_ch0 + c)->Value());
-    wetAmountTarget[c]  = 0.01 * GetParam(kWet_ch0 + c)->Value();
-    mDsp->feedbackAmountTarget[c] = 0.01 * GetParam(kFeedbackAmount_ch0 + c)->Value();
+    inputGainTarget[c]  = std::exp(kDbToLin * GetLinkable(kInputGain_ch0, c));
+    outputGainTarget[c] = std::exp(kDbToLin * GetLinkable(kOutputGain_ch0, c));
+    wetAmountTarget[c]  = 0.01 * GetLinkable(kWet_ch0, c);
+    mDsp->feedbackAmountTarget[c] = 0.01 * GetLinkable(kFeedbackAmount_ch0, c);
 
-    const double hpCutoff = GetParam(kHighPassCutoff_ch0 + c)->Value();
+    const double hpCutoff = GetLinkable(kHighPassCutoff_ch0, c);
     const double g = std::tan(bltFrequencyCoef * hpCutoff);
     mDsp->highPassCoef[c] = g / (1.0 + g);
 
-    const float rmsTime = static_cast<float>(GetParam(kRMSTime_ch0 + c)->Value());
+    const float rmsTime = static_cast<float>(GetLinkable(kRMSTime_ch0, c));
     const double rmsAlpha =
       rmsTime == 0.f ? 0.0
                      : std::exp(-upsampledAngularFrequencyCoef / rmsTime);
-    const double attackFreq = GetParam(kAttack_ch0 + c)->Value();
+    const double attackFreq = GetLinkable(kAttack_ch0, c);
     const double releaseFreq =
-      upsampledAngularFrequencyCoef / GetParam(kRelease_ch0 + c)->Value();
-    const double attackDelay  = 0.01 * GetParam(kAttackDelay_ch0 + c)->Value();
-    const double releaseDelay = 0.01 * GetParam(kReleaseDelay_ch0 + c)->Value();
+      upsampledAngularFrequencyCoef / GetLinkable(kRelease_ch0, c);
+    const double attackDelay  = 0.01 * GetLinkable(kAttackDelay_ch0, c);
+    const double releaseDelay = 0.01 * GetLinkable(kReleaseDelay_ch0, c);
     mEnvelopeFollowerSettings.setup(c, rmsAlpha, attackFreq, releaseFreq,
                                     attackDelay, releaseDelay);
   }
@@ -465,15 +485,14 @@ void Curvessor::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   auto& upsampledIo = upsampledBuffer.getBuffer2(0);
   auto& upsampledDryBuffer = mDryOversampling.getUpSampleOutputInterleaved();
 
-  // Sidechain envelope-input prep.
-  double scWorkL[2048]; // safe upper bound — TODO: heap-alloc properly if blockSize can exceed this
-  double scWorkR[2048];
+  // Sidechain envelope-input prep. Uses the member scratch buffer (sized in
+  // OnReset to GetBlockSize()) so we never touch the stack.
   double* envelopeInput[2];
-  if (isUsingSideChain && nFrames <= 2048) {
-    std::copy(inputs[2], inputs[2] + nFrames, scWorkL);
-    std::copy(inputs[3], inputs[3] + nFrames, scWorkR);
-    envelopeInput[0] = scWorkL;
-    envelopeInput[1] = scWorkR;
+  if (isUsingSideChain) {
+    std::copy(inputs[2], inputs[2] + nFrames, mSidechainScratch.get()[0]);
+    std::copy(inputs[3], inputs[3] + nFrames, mSidechainScratch.get()[1]);
+    envelopeInput[0] = mSidechainScratch.get()[0];
+    envelopeInput[1] = mSidechainScratch.get()[1];
     if (isMidSide) LeftRightToMidSide(envelopeInput, nFrames);
     ApplyGain(envelopeInput, inputGainTarget, mDsp->sidechainInputGain,
               automationAlpha, nFrames);
@@ -554,11 +573,29 @@ void Curvessor::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     MidSideToLeftRight(ioAudio, nFrames);
   }
 
-  // VU meter snapshot to GUI-readable atomics.
-  for (int i = 0; i < 2; ++i) {
-    mLevelVuMeterResults[i].store(static_cast<float>(mDsp->levelVuMeterBuffer[i]));
-    mGainVuMeterResults[i].store(static_cast<float>(mDsp->gainVuMeterBuffer[i]));
+  // VU meter snapshot to GUI-readable atomics + queues. The atomics are kept
+  // for any direct-poll consumer (e.g. a custom paint timer); the senders
+  // feed the IVMeterControls via OnIdle drain.
+  ISenderData<2, float> levelData{kCtrlTagLevelMeter, 2, 0};
+  ISenderData<2, float> gainData{kCtrlTagGainMeter, 2, 0};
+  for (int c = 0; c < 2; ++c) {
+    mLevelVuMeterResults[c].store(static_cast<float>(mDsp->levelVuMeterBuffer[c]));
+    mGainVuMeterResults[c].store(static_cast<float>(mDsp->gainVuMeterBuffer[c]));
+    // IVMeterControl::EResponse::Log wants linear amplitude.
+    levelData.vals[c] = static_cast<float>(std::pow(10.0, mDsp->levelVuMeterBuffer[c] / 20.0));
+    gainData.vals[c]  = static_cast<float>(std::pow(10.0, mDsp->gainVuMeterBuffer[c]  / 20.0));
   }
+  mLevelMeterSender.PushData(levelData);
+  mGainMeterSender.PushData(gainData);
 }
 
 #endif // IPLUG_DSP
+
+// OnIdle is in the API base, not gated by IPLUG_DSP/IPLUG_EDITOR.
+// TransmitData is safe to call whether or not the editor is currently open
+// (it just no-ops via SendControlMsgFromDelegate when there's no UI).
+void Curvessor::OnIdle()
+{
+  mLevelMeterSender.TransmitData(*this);
+  mGainMeterSender.TransmitData(*this);
+}

@@ -8,6 +8,9 @@
 #include "avec/Alignment.hpp"
 #include "avec/Buffer.hpp"
 
+// ISender for audio-thread → UI-thread VU meter packets.
+#include "ISender.h"
+
 #include <array>
 #include <atomic>
 #include <mutex>
@@ -76,6 +79,8 @@ enum ECtrlTags
 {
   kCtrlTagTitle = 0,
   kCtrlTagVersionNumber,
+  kCtrlTagLevelMeter,
+  kCtrlTagGainMeter,
 };
 
 using namespace iplug;
@@ -85,6 +90,10 @@ class Curvessor final : public Plugin
 {
 public:
   Curvessor(const InstanceInfo& info);
+
+  // Runs on the UI thread. Drains both sender queues and pushes packets to
+  // the meter controls via their ctrl tags.
+  void OnIdle() override;
 
 #if IPLUG_EDITOR
   bool OnHostRequestingSupportedViewConfiguration(int width, int height) override { return true; }
@@ -103,6 +112,15 @@ private:
   // Reconfigure the 3 oversamplers if Oversampling or Linear-Phase-Oversampling
   // changed since the last call. Called from ProcessBlock under mOversamplingMutex.
   void EnsureOversamplingCurrent();
+
+  // Read a linkable float-pair param honoring its _is_linked toggle. When
+  // linked, both channels return the value at ch0Idx; otherwise each channel
+  // returns its own. Matches juicy/LinkableParameter::get(channel).
+  double GetLinkable(int ch0Idx, int channel) const
+  {
+    const bool linked = GetParam(ch0Idx + 2)->Bool();
+    return GetParam(ch0Idx + (linked ? 0 : channel))->Value();
+  }
 #endif
 
 #if IPLUG_DSP
@@ -122,11 +140,21 @@ private:
 
   // Holds the dry signal for wet/dry blending after oversampling round-trip.
   avec::Buffer<double> mDryBuffer{2};
+
+  // Scratch for sidechain input copy + in-place M/S / input-gain ramp before
+  // oversampling. Allocated to GetBlockSize() in OnReset.
+  avec::Buffer<double> mSidechainScratch{2};
 #endif
 
 #if IPLUG_DSP || IPLUG_EDITOR
   // VU meter snapshots: written from the audio thread, read from the GUI timer.
   std::array<std::atomic<float>, 2> mLevelVuMeterResults{};
   std::array<std::atomic<float>, 2> mGainVuMeterResults{};
+
+  // Cross-thread queues for the IVMeterControl widgets. Carrying linear
+  // amplitudes (not dB) — IVMeterControl::EResponse::Log calls AmpToDB
+  // internally and maps the result to [0,1] for the bar fill.
+  ISender<2> mLevelMeterSender;
+  ISender<2> mGainMeterSender;
 #endif
 };
