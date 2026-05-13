@@ -1563,6 +1563,28 @@ void Curvessor::OnIdle()
       ctrl->SetDirty(false);
     }
   }
+
+  // Sync the side-panel knobs (X / Y / Tan / Smooth / Link) to their
+  // currently-bound params' live values. The spline editor changes those
+  // params via SendParameterValueFromUI directly (no mVals tying it to
+  // them), so the framework's automatic UpdatePeers path doesn't reach
+  // these knobs — without this pull, dragging a knot in the editor would
+  // leave the panel knobs frozen on whatever they showed at the last
+  // click. SetValueFromDelegate writes the new value into mVals and marks
+  // the control dirty.
+  auto syncControl = [this](iplug::igraphics::IControl* ctrl) {
+    if (!ctrl) return;
+    const int idx = ctrl->GetParamIdx();
+    if (idx < 0) return;
+    if (const IParam* p = GetParam(idx)) {
+      ctrl->SetValueFromDelegate(p->GetNormalized());
+    }
+  };
+  syncControl(mKnotPanelKnobX);
+  syncControl(mKnotPanelKnobY);
+  syncControl(mKnotPanelKnobTan);
+  syncControl(mKnotPanelKnobSmoothness);
+  syncControl(mKnotPanelLink);
 #endif
 }
 
