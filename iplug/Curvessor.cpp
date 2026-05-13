@@ -963,57 +963,94 @@ Curvessor::Curvessor(const InstanceInfo& info)
   };
 
   mLayoutFunc = [&](IGraphics* pGraphics) {
-    // Layout for 1024×640: title strip on top, spline editor + knot panel
-    // band, 2-row param grid, slim meters at the bottom.
+    // Layout (1024×640):
+    //   - title strip on top
+    //   - body band: square spline editor (left), selected-knot column,
+    //     then a globals area for the panel buttons
+    //   - matrix below the body: 10 linkable params × {L, R, Link} rows
+    //   - slim meters at the bottom
     const IRECT bounds = pGraphics->GetBounds();
     const IRECT innerBounds = bounds.GetPadded(-10.f);
 
-    // Top strip: title centred, version in the top-right corner.
+    // ---------- Top strip ----------
     const IRECT topStrip = innerBounds.GetFromTop(28);
     const IRECT titleBounds   = topStrip.GetCentredInside(360, 26);
     const IRECT versionBounds = topStrip.GetFromRight(240);
 
-    // Spline + knot-panel band, 312 px tall starting just below the title.
-    const IRECT splinePanelArea =
-      innerBounds.GetReducedFromTop(36).GetFromTop(312);
-    const IRECT splineEditorRect = splinePanelArea.GetReducedFromRight(208);
-    const IRECT knotPanelRect    = splinePanelArea.GetFromRight(200);
+    // ---------- Bottom meters ----------
+    const IRECT metersArea = innerBounds.GetFromBottom(32);
+    const IRECT levelMeterRect = metersArea.GetFromLeft(metersArea.W() * 0.5f)
+                                            .GetPadded(-4, 0, -4, 0);
+    const IRECT gainMeterRect  = metersArea.GetFromRight(metersArea.W() * 0.5f)
+                                            .GetPadded(-4, 0, -4, 0);
 
-    // Knot panel: 2×2 knob grid (X/Y top row, Tan/Smooth bottom row) + a
-    // Link L/R toggle along the bottom.
-    const IRECT knotPanelKnobsArea = knotPanelRect.GetReducedFromBottom(44);
-    const IRECT knotPanelLinkArea  = knotPanelRect.GetFromBottom(44);
-    auto knobCell = [&](int col, int row) {
-      const float w = knotPanelKnobsArea.W() / 2.f;
-      const float h = knotPanelKnobsArea.H() / 2.f;
-      return IRECT(knotPanelKnobsArea.L + col * w,
-                   knotPanelKnobsArea.T + row * h,
-                   knotPanelKnobsArea.L + (col + 1) * w,
-                   knotPanelKnobsArea.T + (row + 1) * h).GetPadded(-4);
+    // ---------- Body (between title and meters) ----------
+    const IRECT bodyArea = innerBounds.GetReducedFromTop(36)
+                                       .GetReducedFromBottom(40);
+
+    // Square spline editor on the left + side controls on the right.
+    constexpr float kSplineSize = 320.f;
+    const IRECT splineBand    = bodyArea.GetFromTop(kSplineSize);
+    const IRECT splineEditorRect = splineBand.GetFromLeft(kSplineSize);
+    const IRECT sideArea      = splineBand.GetReducedFromLeft(kSplineSize + 12);
+
+    // First column to the right of the spline: stacked knobs for the
+    // currently-selected spline knot (X / Y / Tan / Smooth) + a "Link knot"
+    // toggle at the bottom.
+    constexpr float kSelKnotColW = 90.f;
+    const IRECT selKnotCol = sideArea.GetFromLeft(kSelKnotColW);
+    const IRECT globalsArea = sideArea.GetReducedFromLeft(kSelKnotColW + 12);
+    auto selKnotCell = [&](int row) {
+      const float h = selKnotCol.H() / 5.f;
+      return IRECT(selKnotCol.L, selKnotCol.T + row * h,
+                   selKnotCol.R, selKnotCol.T + (row + 1) * h).GetPadded(-2);
     };
-    const IRECT knobXRect      = knobCell(0, 0);
-    const IRECT knobYRect      = knobCell(1, 0);
-    const IRECT knobTanRect    = knobCell(0, 1);
-    const IRECT knobSmoothRect = knobCell(1, 1);
-    const IRECT linkRect       = knotPanelLinkArea.GetCentredInside(140, 28);
+    const IRECT skXRect    = selKnotCell(0);
+    const IRECT skYRect    = selKnotCell(1);
+    const IRECT skTanRect  = selKnotCell(2);
+    const IRECT skSmRect   = selKnotCell(3);
+    const IRECT skLinkRect = selKnotCell(4).GetCentredInside(78, 26);
 
-    // 2-row param grid below the spline band, 9 cells per row.
-    const IRECT gridArea =
-      innerBounds.GetReducedFromTop(354).GetReducedFromBottom(38);
-    constexpr int kGridCols = 9;
-    constexpr int kGridRows = 2;
-    auto cellAt = [&](int col, int row) {
-      const float colW = gridArea.W() / kGridCols;
-      const float rowH = gridArea.H() / kGridRows;
-      return IRECT(gridArea.L + col * colW, gridArea.T + row * rowH,
-                   gridArea.L + (col + 1) * colW, gridArea.T + (row + 1) * rowH).GetPadded(-4);
+    // Globals: 4 cols × 2 rows.
+    auto globalsCell = [&](int col, int row) {
+      const float w = globalsArea.W() / 4.f;
+      const float h = globalsArea.H() / 2.f;
+      return IRECT(globalsArea.L + col * w, globalsArea.T + row * h,
+                   globalsArea.L + (col + 1) * w, globalsArea.T + (row + 1) * h)
+        .GetPadded(-4);
     };
 
-    // Meters in a slim strip along the bottom edge.
-    const IRECT metersArea     = innerBounds.GetFromBottom(32);
-    const IRECT levelMeterRect = metersArea.GetFromLeft(metersArea.W() * 0.5f).GetPadded(-4, 0, -4, 0);
-    const IRECT gainMeterRect  = metersArea.GetFromRight(metersArea.W() * 0.5f).GetPadded(-4, 0, -4, 0);
+    // ---------- Matrix below body ----------
+    // 10 columns × { header row, L knob row, R knob row, Link toggle row }
+    // + a left margin of row labels.
+    const IRECT matrixArea = bodyArea.GetReducedFromTop(kSplineSize + 12);
+    const IRECT matrixHeaderArea = matrixArea.GetFromTop(16);
+    const IRECT matrixBody = matrixArea.GetReducedFromTop(20);
+    constexpr float kRowLabelW = 38.f;
+    const IRECT rowLabelCol = matrixBody.GetFromLeft(kRowLabelW);
+    const IRECT paramColsArea = matrixBody.GetReducedFromLeft(kRowLabelW);
+    constexpr int kNumLinkables = 10;
+    const float colW = paramColsArea.W() / kNumLinkables;
+    auto headerRect = [&](int idx) {
+      return IRECT(paramColsArea.L + idx * colW, matrixHeaderArea.T,
+                   paramColsArea.L + (idx + 1) * colW, matrixHeaderArea.B);
+    };
+    auto matrixCell = [&](int colIdx, int rowIdx) {
+      const float rowH = paramColsArea.H() / 3.f;
+      return IRECT(paramColsArea.L + colIdx * colW,
+                   paramColsArea.T + rowIdx * rowH,
+                   paramColsArea.L + (colIdx + 1) * colW,
+                   paramColsArea.T + (rowIdx + 1) * rowH).GetPadded(-2);
+    };
+    const float labelRowH = rowLabelCol.H() / 3.f;
+    const IRECT lblLRect    = IRECT(rowLabelCol.L, rowLabelCol.T,
+                                    rowLabelCol.R, rowLabelCol.T + labelRowH);
+    const IRECT lblRRect    = IRECT(rowLabelCol.L, rowLabelCol.T + labelRowH,
+                                    rowLabelCol.R, rowLabelCol.T + 2 * labelRowH);
+    const IRECT lblLinkRect = IRECT(rowLabelCol.L, rowLabelCol.T + 2 * labelRowH,
+                                    rowLabelCol.R, rowLabelCol.B);
 
+    // ---------- Resize-relayout branch ----------
     if (pGraphics->NControls()) {
       pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(bounds);
       pGraphics->GetControlWithTag(kCtrlTagTitle)->SetTargetAndDrawRECTs(titleBounds);
@@ -1021,20 +1058,20 @@ Curvessor::Curvessor(const InstanceInfo& info)
       pGraphics->GetControlWithTag(kCtrlTagSplineEditor)->SetTargetAndDrawRECTs(splineEditorRect);
       pGraphics->GetControlWithTag(kCtrlTagLevelMeter)->SetTargetAndDrawRECTs(levelMeterRect);
       pGraphics->GetControlWithTag(kCtrlTagGainMeter)->SetTargetAndDrawRECTs(gainMeterRect);
-      if (mKnotPanelKnobX)          mKnotPanelKnobX         ->SetTargetAndDrawRECTs(knobXRect);
-      if (mKnotPanelKnobY)          mKnotPanelKnobY         ->SetTargetAndDrawRECTs(knobYRect);
-      if (mKnotPanelKnobTan)        mKnotPanelKnobTan       ->SetTargetAndDrawRECTs(knobTanRect);
-      if (mKnotPanelKnobSmoothness) mKnotPanelKnobSmoothness->SetTargetAndDrawRECTs(knobSmoothRect);
-      if (mKnotPanelLink)           mKnotPanelLink          ->SetTargetAndDrawRECTs(linkRect);
+      if (mKnotPanelKnobX)          mKnotPanelKnobX         ->SetTargetAndDrawRECTs(skXRect);
+      if (mKnotPanelKnobY)          mKnotPanelKnobY         ->SetTargetAndDrawRECTs(skYRect);
+      if (mKnotPanelKnobTan)        mKnotPanelKnobTan       ->SetTargetAndDrawRECTs(skTanRect);
+      if (mKnotPanelKnobSmoothness) mKnotPanelKnobSmoothness->SetTargetAndDrawRECTs(skSmRect);
+      if (mKnotPanelLink)           mKnotPanelLink          ->SetTargetAndDrawRECTs(skLinkRect);
+      // (matrix cells and globals don't have tags right now — they stay at
+      // their initial positions on resize.)
       return;
     }
 
+    // ---------- First-time attach ----------
     pGraphics->SetLayoutOnResize(true);
     pGraphics->AttachCornerResizer(EUIResizerMode::Size, true);
     pGraphics->LoadFont("Roboto-Regular", ROBOTO_FN);
-    // Dark chassis. A textured background bitmap (rack-on-spacestation art)
-    // can replace this later via AttachBackground; the rest of the palette
-    // is designed to read over either.
     pGraphics->AttachPanelBackground(kPanelBg);
 
     pGraphics->AttachControl(
@@ -1050,126 +1087,108 @@ Curvessor::Curvessor(const InstanceInfo& info)
       new CurvessorSplineControl(splineEditorRect),
       kCtrlTagSplineEditor);
 
-    // Knot side-panel.
+    // Selected-knot column.
     {
       const int base = kKnot1_enabled + mSelectedKnot * 10;
       const int chBase = base + 2 + mSelectedChannel * 4;
-      // Shrink the panel knobs to match the param grid's compact sizing.
-      const IRECT kX  = knobXRect     .GetCentredInside(64, 84);
-      const IRECT kY  = knobYRect     .GetCentredInside(64, 84);
-      const IRECT kT  = knobTanRect   .GetCentredInside(64, 84);
-      const IRECT kS  = knobSmoothRect.GetCentredInside(64, 84);
-      mKnotPanelKnobX          = pGraphics->AttachControl(new IVKnobControl(kX, chBase + 0, "X (dB)",  kCurvessorStyle));
-      mKnotPanelKnobY          = pGraphics->AttachControl(new IVKnobControl(kY, chBase + 1, "Y (dB)",  kCurvessorStyle));
-      mKnotPanelKnobTan        = pGraphics->AttachControl(new IVKnobControl(kT, chBase + 2, "Tangent", kCurvessorStyle));
-      mKnotPanelKnobSmoothness = pGraphics->AttachControl(new IVKnobControl(kS, chBase + 3, "Smooth",  kCurvessorStyle));
+      const IRECT kX = skXRect.GetCentredInside(60, 64);
+      const IRECT kY = skYRect.GetCentredInside(60, 64);
+      const IRECT kT = skTanRect.GetCentredInside(60, 64);
+      const IRECT kS = skSmRect.GetCentredInside(60, 64);
+      mKnotPanelKnobX          = pGraphics->AttachControl(new IVKnobControl(kX, chBase + 0, "X",      kCurvessorStyle));
+      mKnotPanelKnobY          = pGraphics->AttachControl(new IVKnobControl(kY, chBase + 1, "Y",      kCurvessorStyle));
+      mKnotPanelKnobTan        = pGraphics->AttachControl(new IVKnobControl(kT, chBase + 2, "Tan",    kCurvessorStyle));
+      mKnotPanelKnobSmoothness = pGraphics->AttachControl(new IVKnobControl(kS, chBase + 3, "Smooth", kCurvessorStyle));
       mKnotPanelLink           = pGraphics->AttachControl(
-        new IVSwitchControl(linkRect, base + 1, "Link knot L/R", kCurvessorStyle));
+        new IVSwitchControl(skLinkRect, base + 1, "Link knot", kCurvessorStyle));
     }
 
-    // Knob size targets: ~52 px circle on a ~92 px tall cell. Leaves room
-    // below for the IVKnob label without crowding adjacent rows.
-    constexpr float kKnobDiameter = 52.f;
-    constexpr float kKnobAreaH    = 78.f;  // disk + label
-    constexpr float kLinkButtonW  = 14.f;
-    constexpr float kLinkButtonH  = 28.f;
+    // Globals area.
+    auto switchInCell = [&](int col, int row, float w, float h) {
+      return globalsCell(col, row).GetCentredInside(w, h);
+    };
+    auto knobInCell = [&](int col, int row) {
+      return globalsCell(col, row).GetCentredInside(58, 78);
+    };
+    pGraphics->AttachControl(new IVSwitchControl   (switchInCell(0, 0, 86, 34), kMidSide,                 "Mid/Side",     kCurvessorStyle));
+    pGraphics->AttachControl(new IVSwitchControl   (switchInCell(1, 0, 86, 34), kSideChain,               "Sidechain",    kCurvessorStyle));
+    pGraphics->AttachControl(new IVTabSwitchControl(switchInCell(2, 0,108, 32), kOversampling,
+                              {"1x","2x","4x","8x","16x","32x"}, "Oversampling", kCurvessorStyle));
+    pGraphics->AttachControl(new IVSwitchControl   (switchInCell(3, 0, 86, 34), kLinearPhaseOversampling, "Lin Phase",    kCurvessorStyle));
+    pGraphics->AttachControl(new IVKnobControl(knobInCell(0, 1), kStereoLink,    "Stereo Link", kCurvessorStyle));
+    pGraphics->AttachControl(new IVKnobControl(knobInCell(1, 1), kSmoothingTime, "Smoothing",   kCurvessorStyle));
+    pGraphics->AttachControl(new IVTabSwitchControl(switchInCell(2, 1, 96, 32), kHighPassOrder,
+                              {"Off","6","12","18"}, "HP Order",    kCurvessorStyle));
+    // globalsCell(3, 1) intentionally empty.
 
-    auto centredKnobRect = [&](const IRECT& cell) {
-      return cell.GetCentredInside(kKnobDiameter, kKnobAreaH);
+    // ---------- Matrix ----------
+    struct LinkableSpec { const char* name; int ch0Idx; };
+    static const LinkableSpec linkables[kNumLinkables] = {
+      { "In",  kInputGain_ch0      },
+      { "Out", kOutputGain_ch0     },
+      { "Wet", kWet_ch0            },
+      { "Fb",  kFeedbackAmount_ch0 },
+      { "Atk", kAttack_ch0         },
+      { "Rel", kRelease_ch0        },
+      { "AD",  kAttackDelay_ch0    },
+      { "RD",  kReleaseDelay_ch0   },
+      { "RMS", kRMSTime_ch0        },
+      { "HP",  kHighPassCutoff_ch0 },
     };
 
-    // Linkable pair: two compact knobs (ch0 / L and ch1 / R) side by side,
-    // plus a slim toggle that gates the _is_linked bool. When the toggle
-    // is on (default), GetLinkable reads ch0 for both channels and the R
-    // knob's value is ignored DSP-side. When off, each knob drives its
-    // own channel. Knob labels are "<short> L" and "<short> R" so the
-    // user can see at a glance which channel is which.
-    auto attachLinkable = [&](const IRECT& cell, int ch0Idx, const char* shortName) {
-      constexpr float kPairKnobDiam = 38.f;
-      constexpr float kPairKnobH    = 64.f;
-      constexpr float kPairGap      = 2.f;
-      constexpr float kPairToggleW  = 14.f;
-      constexpr float kPairToggleH  = 24.f;
-      const float totalW = 2.f * kPairKnobDiam + kPairGap + 4.f + kPairToggleW;
-      const IRECT inner = cell.GetCentredInside(totalW, kPairKnobH);
+    // Column-header text style: low contrast, like the spline LCD axis
+    // labels, so the matrix reads as instrumentation rather than chrome.
+    static const IText kMatrixHeaderText(11, IColor(255, 170, 200, 215),
+                                         nullptr, EAlign::Center);
+    static const IText kRowLabelText(11, IColor(255, 170, 200, 215),
+                                     nullptr, EAlign::Center);
+    const IVStyle matrixKnobStyle = kCurvessorStyle.WithShowLabel(false)
+                                                   .WithFrameThickness(0.f);
+    const IVStyle matrixToggleStyle = kCurvessorStyle.WithShowLabel(false);
 
-      char labL[16], labR[16];
-      std::snprintf(labL, sizeof(labL), "%s L", shortName);
-      std::snprintf(labR, sizeof(labR), "%s R", shortName);
+    for (int i = 0; i < kNumLinkables; ++i) {
+      const auto& lp = linkables[i];
 
-      const IRECT lKnob (inner.L,
-                         inner.T,
-                         inner.L + kPairKnobDiam,
-                         inner.B);
-      const IRECT rKnob (lKnob.R + kPairGap,
-                         inner.T,
-                         lKnob.R + kPairGap + kPairKnobDiam,
-                         inner.B);
-      const IRECT tBtn (inner.R - kPairToggleW,
-                        inner.MH() - kPairToggleH * 0.5f,
-                        inner.R,
-                        inner.MH() + kPairToggleH * 0.5f);
-
-      pGraphics->AttachControl(new IVKnobControl(lKnob, ch0Idx + 0, labL, kCurvessorStyle));
-      pGraphics->AttachControl(new IVKnobControl(rKnob, ch0Idx + 1, labR, kCurvessorStyle));
-      pGraphics->AttachControl(new IVSwitchControl(tBtn, ch0Idx + 2, "L=R", kCurvessorStyle));
-    };
-
-    // Non-linkable knob with the same compact sizing.
-    auto attachKnob = [&](const IRECT& cell, int paramIdx, const char* label) {
+      // Column header.
       pGraphics->AttachControl(
-        new IVKnobControl(centredKnobRect(cell), paramIdx, label, kCurvessorStyle));
-    };
+        new ITextControl(headerRect(i), lp.name, kMatrixHeaderText));
 
-    // Compact switch / tab cell: don't fill the whole grid cell, just a
-    // centred lozenge so adjacent controls breathe.
-    auto switchRect = [&](const IRECT& cell, float w, float h) {
-      return cell.GetCentredInside(w, h);
-    };
+      const IRECT lCell = matrixCell(i, 0);
+      const IRECT rCell = matrixCell(i, 1);
+      const IRECT lnkCell = matrixCell(i, 2);
 
-    // Row 0 — globals + filter.
-    pGraphics->AttachControl(new IVSwitchControl   (switchRect(cellAt(0, 0), 70, 32), kMidSide,                "Mid/Side",   kCurvessorStyle));
-    pGraphics->AttachControl(new IVSwitchControl   (switchRect(cellAt(1, 0), 70, 32), kSideChain,              "Sidechain",  kCurvessorStyle));
-    pGraphics->AttachControl(new IVTabSwitchControl(switchRect(cellAt(2, 0), 96, 28), kOversampling,
-                              {"1x", "2x", "4x", "8x", "16x", "32x"}, "Oversampling", kCurvessorStyle));
-    pGraphics->AttachControl(new IVSwitchControl   (switchRect(cellAt(3, 0), 70, 32), kLinearPhaseOversampling, "Lin Phase", kCurvessorStyle));
-    attachLinkable(cellAt(4, 0), kHighPassCutoff_ch0, "HP");
-    pGraphics->AttachControl(new IVTabSwitchControl(switchRect(cellAt(5, 0), 86, 28), kHighPassOrder,
-                              {"Off", "6", "12", "18"}, "HP Order", kCurvessorStyle));
-    attachKnob(cellAt(6, 0), kStereoLink,    "Stereo Link");
-    attachKnob(cellAt(7, 0), kSmoothingTime, "Smoothing");
-    // cellAt(8, 0) intentionally empty for now.
+      const IRECT lKnob = lCell.GetCentredInside(36, std::min(lCell.H(), 44.f));
+      const IRECT rKnob = rCell.GetCentredInside(36, std::min(rCell.H(), 44.f));
+      const IRECT lnkBtn = lnkCell.GetCentredInside(38, std::min(lnkCell.H(), 22.f));
 
-    // Row 1 — signal-flow params (input → output, plus envelope shape).
-    // Labels are short to fit the small dual-knob layout; the long form
-    // is in each knob's automation-/tooltip-name via InitDouble's `name`.
-    attachLinkable(cellAt(0, 1), kInputGain_ch0,      "In");
-    attachLinkable(cellAt(1, 1), kOutputGain_ch0,     "Out");
-    attachLinkable(cellAt(2, 1), kWet_ch0,            "Wet");
-    attachLinkable(cellAt(3, 1), kFeedbackAmount_ch0, "Fb");
-    attachLinkable(cellAt(4, 1), kAttack_ch0,         "Atk");
-    attachLinkable(cellAt(5, 1), kRelease_ch0,        "Rel");
-    attachLinkable(cellAt(6, 1), kAttackDelay_ch0,    "AD");
-    attachLinkable(cellAt(7, 1), kReleaseDelay_ch0,   "RD");
-    attachLinkable(cellAt(8, 1), kRMSTime_ch0,        "RMS");
+      pGraphics->AttachControl(new IVKnobControl(lKnob,  lp.ch0Idx + 0, "", matrixKnobStyle));
+      pGraphics->AttachControl(new IVKnobControl(rKnob,  lp.ch0Idx + 1, "", matrixKnobStyle));
+      pGraphics->AttachControl(new IVSwitchControl(lnkBtn, lp.ch0Idx + 2, "", matrixToggleStyle));
+    }
 
-    // VU meters fed by ISender packets pushed from ProcessBlock.
+    // Row labels. "L" / "R" become "M" / "S" in mid/side mode — OnIdle
+    // syncs the text based on kMidSide state.
+    {
+      auto* lblL = new ITextControl(lblLRect, "L", kRowLabelText);
+      auto* lblR = new ITextControl(lblRRect, "R", kRowLabelText);
+      auto* lblK = new ITextControl(lblLinkRect, "Link", kRowLabelText);
+      pGraphics->AttachControl(lblL);
+      pGraphics->AttachControl(lblR);
+      pGraphics->AttachControl(lblK);
+      mRowLabelL = lblL;
+      mRowLabelR = lblR;
+    }
+
+    // Meters.
     const IVStyle meterStyle = kCurvessorStyle.WithDrawFrame(false);
-    // Level meter is one-sided (audio level): -60..+6 dB.
     pGraphics->AttachControl(
       new IVMeterControl<2>(levelMeterRect, "Level", meterStyle,
-                            EDirection::Horizontal, {"L", "R"}, 0,
+                            EDirection::Horizontal, {"L","R"}, 0,
                             IVMeterControl<2>::EResponse::Log, -60.f, 6.f),
       kCtrlTagLevelMeter);
-    // Gain meter shows gain correction in dB — symmetric around 0 so both
-    // compression (gc < 0) and expansion (gc > 0) read clearly. ±36 dB
-    // covers anything Curvessor's curve realistically applies; tick marks
-    // every 6 dB inside that range. SetBaseValue(0.5) anchors the fill at
-    // the centre of the bar, so compression extends to the left and
-    // expansion to the right rather than both filling from the same edge.
     auto* gainMeter = static_cast<IVMeterControl<2>*>(pGraphics->AttachControl(
       new IVMeterControl<2>(gainMeterRect, "Gain", meterStyle,
-                            EDirection::Horizontal, {"L", "R"}, 0,
+                            EDirection::Horizontal, {"L","R"}, 0,
                             IVMeterControl<2>::EResponse::Log, -36.f, 36.f,
                             {-24, -12, -6, 0, 6, 12, 24}),
       kCtrlTagGainMeter));
@@ -1585,6 +1604,77 @@ void Curvessor::OnIdle()
   syncControl(mKnotPanelKnobTan);
   syncControl(mKnotPanelKnobSmoothness);
   syncControl(mKnotPanelLink);
+
+  // Matrix row labels: "L"/"R" in stereo mode, "M"/"S" in mid-side mode.
+  if (mRowLabelL && mRowLabelR) {
+    const bool ms = GetParam(kMidSide)->Bool();
+    const char* lText = ms ? "M" : "L";
+    const char* rText = ms ? "S" : "R";
+    // SetStr is a no-op when the new string matches the old, so it's cheap
+    // to call every frame.
+    mRowLabelL->SetStr(lText);
+    mRowLabelR->SetStr(rText);
+  }
+#endif
+}
+
+// =============================================================================
+// Linkable-pair propagation. Called whenever any param changes, on the UI
+// thread. For the 10 linkable pairs (Input-Gain / Output-Gain / Wet /
+// Feedback / Attack / Release / Attack-Delay / Release-Delay / RMS-Time /
+// HP-Cutoff), if the pair's _is_linked toggle is on and ch0 or ch1
+// changed, copy the new value to the other channel so the two knobs track
+// each other 1:1 while the user drags. The mPropagatingLinkChange guard
+// breaks the recursive cycle (ch0 → ch1 → ch0 → …).
+// =============================================================================
+void Curvessor::OnParamChangeUI(int paramIdx, EParamSource source)
+{
+#if IPLUG_EDITOR
+  if (mPropagatingLinkChange) return;
+  // Only propagate user-driven UI changes. Skip kHost / kPresetRecall /
+  // kReset / kUnknown so that:
+  //  - auval's "did the value persist after init?" check isn't broken by
+  //    cross-channel cascades during the test setter;
+  //  - preset / state restoration doesn't have one channel overwriting
+  //    the other on the way in.
+  if (source != kUI) return;
+
+  static constexpr int kLinkableCh0Bases[] = {
+    kInputGain_ch0,      kOutputGain_ch0,     kWet_ch0,
+    kFeedbackAmount_ch0, kAttack_ch0,         kRelease_ch0,
+    kAttackDelay_ch0,    kReleaseDelay_ch0,   kRMSTime_ch0,
+    kHighPassCutoff_ch0,
+  };
+
+  for (int ch0 : kLinkableCh0Bases) {
+    if (paramIdx != ch0 && paramIdx != ch0 + 1) continue;
+
+    // Linked? If not, leave the channels independent.
+    if (!GetParam(ch0 + 2)->Bool()) return;
+
+    const int other = (paramIdx == ch0) ? (ch0 + 1) : ch0;
+    const double norm = GetParam(paramIdx)->GetNormalized();
+
+    // No-op if already in sync — avoids gratuitous SetDirty churn.
+    if (std::abs(GetParam(other)->GetNormalized() - norm) < 1e-9) return;
+
+    // Update the param itself (so DSP sees the new value when the toggle
+    // later flips to off, and so the host's automation lane shows both
+    // channels moving together) and push the new value into any UI knob
+    // currently bound to it. The host-side notification fires through
+    // SendParameterValueFromUI; the UI-side update needs the explicit
+    // SetValueFromDelegate because the calling knob doesn't have `other`
+    // in its mVals so iPlug2's automatic UpdatePeers path doesn't reach.
+    mPropagatingLinkChange = true;
+    SendParameterValueFromUI(other, norm);
+    if (auto* ui = GetUI()) {
+      ui->ForControlWithParam(other, [norm](iplug::igraphics::IControl* ctrl) {
+        ctrl->SetValueFromDelegate(norm);
+      });
+    }
+    mPropagatingLinkChange = false;
+    return;
+  }
 #endif
 }
 

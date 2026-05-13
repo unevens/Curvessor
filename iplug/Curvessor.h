@@ -11,6 +11,14 @@
 // ISender for audio-thread → UI-thread VU meter packets.
 #include "ISender.h"
 
+// Forward declarations to keep IControls.h out of the plugin header — the
+// .cpp includes it directly when it needs the full ITextControl definition.
+namespace iplug {
+namespace igraphics {
+  class ITextControl;
+}
+}
+
 #include <array>
 #include <atomic>
 #include <mutex>
@@ -95,6 +103,21 @@ public:
   // Runs on the UI thread. Drains both sender queues and pushes packets to
   // the meter controls via their ctrl tags.
   void OnIdle() override;
+
+  // Linkable-pair propagation: when a ch0 or ch1 param changes and the
+  // pair's _is_linked toggle is on, copy the change to the other channel
+  // so both knobs stay in sync during a drag (and both stay in sync at
+  // rest, so unlinking later doesn't pop ch1 to a stale value).
+  void OnParamChangeUI(int paramIdx, EParamSource source = kUnknown) override;
+
+private:
+  // Guards against infinite recursion when OnParamChangeUI calls
+  // SendParameterValueFromUI on the other channel — that call re-enters
+  // OnParamChangeUI for the other param, which would otherwise try to
+  // mirror back to the first and loop forever.
+  bool mPropagatingLinkChange = false;
+
+public:
 
 #if IPLUG_EDITOR
   bool OnHostRequestingSupportedViewConfiguration(int width, int height) override { return true; }
@@ -181,4 +204,8 @@ private:
   iplug::igraphics::IControl* mKnotPanelKnobTan = nullptr;
   iplug::igraphics::IControl* mKnotPanelKnobSmoothness = nullptr;
   iplug::igraphics::IControl* mKnotPanelLink = nullptr;
+  // Matrix row labels — rewritten "L"/"R" → "M"/"S" when the Mid-Side
+  // toggle is on, kept in sync from OnIdle.
+  iplug::igraphics::ITextControl* mRowLabelL = nullptr;
+  iplug::igraphics::ITextControl* mRowLabelR = nullptr;
 };
