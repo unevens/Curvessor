@@ -214,7 +214,8 @@ public:
     // arrives via mLevelMeterSender → OnMsgFromDelegate; convert back to dB
     // here so we can place it on the curve's X axis. The dot's Y is the
     // spline's response at that X — i.e. exactly where the compressor is
-    // currently acting.
+    // currently acting. The vertical line from the dot to the y=x identity
+    // line shows the actual gain correction in dB at this input level.
     for (int c = 0; c < 2; ++c) {
       const float amp = mCurrentLevelAmp[c];
       if (amp <= 0.f) continue;  // pre-roll: env is silence, skip
@@ -223,6 +224,16 @@ public:
       const double yDb = mSpline.process(dB, c, numActive);
       const float dx = DbToScreenX(dB);
       const float dy = DbToScreenY(yDb);
+      const float identityY = DbToScreenY(dB);  // y == x at this input
+
+      // Gain-reduction (or expansion) line: from the curve point vertically
+      // to the identity line. Slightly translucent so the curve underneath
+      // stays visible.
+      const IColor grCol = (c == 0)
+        ? IColor(180, 200, 230, 255)
+        : IColor(180, 255, 200, 200);
+      g.DrawLine(grCol, dx, dy, dx, identityY, nullptr, 2.f);
+
       const IColor dotCol = (c == 0)
         ? IColor(255, 200, 230, 255)
         : IColor(255, 255, 200, 200);
