@@ -276,14 +276,59 @@ public:
       g.DrawCircle(kLcdKnotRing, dx, dy, 4.f, nullptr, 1.f);
     }
 
+    // Reset-zoom button, painted only when actually zoomed in. Clicking it
+    // returns the viewport to the full -96..+6 dB range on both axes.
+    if (mZoom > 1.001) {
+      const IRECT btn = ResetButtonRect();
+      g.FillRoundRect(IColor(220, 22, 38, 50), btn, 3.f);
+      g.DrawRoundRect(kLcdFrame, btn, 3.f, nullptr, 1.f);
+      static const IText kResetBtnText(10, IColor(255, 200, 230, 240),
+                                       nullptr, EAlign::Center);
+      g.DrawText(kResetBtnText, "1:1", btn);
+    }
+
     // LCD frame.
     g.DrawRect(kLcdFrame, mRECT, nullptr, 1.f);
+  }
+
+  void OnMouseWheel(float x, float y, const IMouseMod&, float d) override
+  {
+    // Scroll-wheel zoom around the cursor: the dB point under the cursor
+    // stays anchored to the same pixel before/after the zoom change.
+    const double cursorX = ScreenXToDb(x);
+    const double cursorY = ScreenYToDb(y);
+
+    // Per-tick zoom factor. Positive d (scroll up) = zoom in.
+    const double factor = std::pow(1.25, static_cast<double>(d));
+    const double newZoom = std::clamp(mZoom * factor, kMinZoom, kMaxZoom);
+    if (newZoom == mZoom) return;
+    mZoom = newZoom;
+
+    // Recompute viewport centre so cursor's pre-zoom dB still maps to its
+    // screen position. Derived from the inverse of ScreenXToDb:
+    //   cursorX = (centerX - hv) + frac * 2*hv
+    //         => centerX = cursorX + hv*(1 - 2*frac)
+    const double hv = VisibleHalfRange();
+    const double fracX = (x - mRECT.L) / static_cast<double>(mRECT.W());
+    const double fracY = (mRECT.B - y) / static_cast<double>(mRECT.H());
+    mZoomCenterX = cursorX + hv * (1.0 - 2.0 * fracX);
+    mZoomCenterY = cursorY + hv * (1.0 - 2.0 * fracY);
+    ClampViewToDataRange();
+    SetDirty(false);
   }
 
   void OnMouseDown(float x, float y, const IMouseMod& mod) override
   {
     auto* del = GetDelegate();
     const bool preferCh1 = mod.R || mod.A;
+
+    // Reset-zoom button in the top-right corner. Has to win the priority
+    // race vs everything else (its rect overlaps the editor's drawable
+    // area where knots and tangent handles also live).
+    if (ResetButtonRect().Contains(x, y)) {
+      ResetZoom();
+      return;
+    }
 
     // Tangent handle on the currently-selected knot takes priority — it
     // overlaps the knot area visually but the hit is the smaller dot.
@@ -462,25 +507,75 @@ private:
   // a dot riding along the curve to show where compression is acting now.
   std::array<float, 2> mCurrentLevelAmp{};
 
+  // Uniform 2D zoom on the LCD viewport, scroll-wheel driven; zoomCenter*
+  // is the dB point at the centre of the visible window. Reset returns to
+  // mZoom = 1 (full -96..+6 dB on both axes).
+  double mZoom = 1.0;
+  double mZoomCenterX = (kKnotMin + kKnotMax) * 0.5;
+  double mZoomCenterY = (kKnotMin + kKnotMax) * 0.5;
+  static constexpr double kMinZoom = 1.0;
+  static constexpr double kMaxZoom = 16.0;
+
+  // dB ↔ screen mappings, both apply the zoom-and-pan viewport. At zoom = 1
+  // and the default centre, this is identical to the un-zoomed mapping.
+  // Visible window half-range = totalRange / 2 / mZoom.
+  double VisibleHalfRange() const
+  {
+    return (kKnotMax - kKnotMin) * 0.5 / mZoom;
+  }
   float DbToScreenX(double db) const
   {
-    return mRECT.L +
-      static_cast<float>((db - kKnotMin) / (kKnotMax - kKnotMin)) * mRECT.W();
+    const double hv = VisibleHalfRange();
+    const double frac = (db - (mZoomCenterX - hv)) / (2.0 * hv);
+    return mRECT.L + static_cast<float>(frac) * mRECT.W();
   }
   float DbToScreenY(double db) const
   {
-    return mRECT.B -
-      static_cast<float>((db - kKnotMin) / (kKnotMax - kKnotMin)) * mRECT.H();
+    const double hv = VisibleHalfRange();
+    const double frac = (db - (mZoomCenterY - hv)) / (2.0 * hv);
+    return mRECT.B - static_cast<float>(frac) * mRECT.H();
   }
   double ScreenXToDb(float x) const
   {
-    return kKnotMin +
-      (x - mRECT.L) / static_cast<double>(mRECT.W()) * (kKnotMax - kKnotMin);
+    const double hv = VisibleHalfRange();
+    const double frac = (x - mRECT.L) / static_cast<double>(mRECT.W());
+    return (mZoomCenterX - hv) + frac * 2.0 * hv;
   }
   double ScreenYToDb(float y) const
   {
-    return kKnotMin +
-      (mRECT.B - y) / static_cast<double>(mRECT.H()) * (kKnotMax - kKnotMin);
+    const double hv = VisibleHalfRange();
+    const double frac = (mRECT.B - y) / static_cast<double>(mRECT.H());
+    return (mZoomCenterY - hv) + frac * 2.0 * hv;
+  }
+
+  // Keep the viewport inside [kKnotMin, kKnotMax] in both axes so the user
+  // can't scroll/zoom off the data range.
+  void ClampViewToDataRange()
+  {
+    if (mZoom <= 1.0) {
+      mZoom = 1.0;
+      mZoomCenterX = (kKnotMin + kKnotMax) * 0.5;
+      mZoomCenterY = (kKnotMin + kKnotMax) * 0.5;
+      return;
+    }
+    const double hv = VisibleHalfRange();
+    mZoomCenterX = std::clamp(mZoomCenterX, kKnotMin + hv, kKnotMax - hv);
+    mZoomCenterY = std::clamp(mZoomCenterY, kKnotMin + hv, kKnotMax - hv);
+  }
+
+  void ResetZoom()
+  {
+    mZoom = 1.0;
+    mZoomCenterX = (kKnotMin + kKnotMax) * 0.5;
+    mZoomCenterY = (kKnotMin + kKnotMax) * 0.5;
+    SetDirty(false);
+  }
+
+  // Reset-zoom button in the LCD's top-right corner. 38 × 16 px, "1:1".
+  IRECT ResetButtonRect() const
+  {
+    return IRECT(mRECT.R - 42.f, mRECT.T + 4.f,
+                 mRECT.R - 4.f,  mRECT.T + 20.f);
   }
 
   void DrawCurve(IGraphics& g, int channel, const IColor& col, int numActive)
@@ -921,32 +1016,70 @@ Curvessor::Curvessor(const InstanceInfo& info)
     {
       const int base = kKnot1_enabled + mSelectedKnot * 10;
       const int chBase = base + 2 + mSelectedChannel * 4;
-      mKnotPanelKnobX          = pGraphics->AttachControl(new IVKnobControl(knobXRect,      chBase + 0, "X (dB)",   kCurvessorStyle));
-      mKnotPanelKnobY          = pGraphics->AttachControl(new IVKnobControl(knobYRect,      chBase + 1, "Y (dB)",   kCurvessorStyle));
-      mKnotPanelKnobTan        = pGraphics->AttachControl(new IVKnobControl(knobTanRect,    chBase + 2, "Tangent",  kCurvessorStyle));
-      mKnotPanelKnobSmoothness = pGraphics->AttachControl(new IVKnobControl(knobSmoothRect, chBase + 3, "Smooth",   kCurvessorStyle));
-      mKnotPanelLink           = pGraphics->AttachControl(new IVSwitchControl(linkRect, base + 1, "Link L/R", kCurvessorStyle));
+      // Shrink the panel knobs to match the param grid's compact sizing.
+      const IRECT kX  = knobXRect     .GetCentredInside(64, 84);
+      const IRECT kY  = knobYRect     .GetCentredInside(64, 84);
+      const IRECT kT  = knobTanRect   .GetCentredInside(64, 84);
+      const IRECT kS  = knobSmoothRect.GetCentredInside(64, 84);
+      mKnotPanelKnobX          = pGraphics->AttachControl(new IVKnobControl(kX, chBase + 0, "X (dB)",  kCurvessorStyle));
+      mKnotPanelKnobY          = pGraphics->AttachControl(new IVKnobControl(kY, chBase + 1, "Y (dB)",  kCurvessorStyle));
+      mKnotPanelKnobTan        = pGraphics->AttachControl(new IVKnobControl(kT, chBase + 2, "Tangent", kCurvessorStyle));
+      mKnotPanelKnobSmoothness = pGraphics->AttachControl(new IVKnobControl(kS, chBase + 3, "Smooth",  kCurvessorStyle));
+      mKnotPanelLink           = pGraphics->AttachControl(
+        new IVSwitchControl(linkRect, base + 1, "Link knot L/R", kCurvessorStyle));
     }
 
-    // Linkable pair: knob on ch0 + small "L" toggle bound to _is_linked.
+    // Knob size targets: ~52 px circle on a ~92 px tall cell. Leaves room
+    // below for the IVKnob label without crowding adjacent rows.
+    constexpr float kKnobDiameter = 52.f;
+    constexpr float kKnobAreaH    = 78.f;  // disk + label
+    constexpr float kLinkButtonW  = 14.f;
+    constexpr float kLinkButtonH  = 28.f;
+
+    auto centredKnobRect = [&](const IRECT& cell) {
+      return cell.GetCentredInside(kKnobDiameter, kKnobAreaH);
+    };
+
+    // Linkable pair: small ch0 knob with a slim "L/R" link toggle next to
+    // it. When the toggle is on (default), both channels follow ch0; when
+    // off the user can drive ch1 independently (currently from the host's
+    // automation lane, or via the spline-editor's right/Alt-click on
+    // overlapping knots if applicable — knobs for ch1 will land in a
+    // future side-panel pass).
     auto attachLinkable = [&](const IRECT& cell, int ch0Idx, const char* label) {
-      const IRECT knobRect = cell.GetReducedFromRight(20);
-      const IRECT lRect   = cell.GetFromRight(18).GetPadded(0, -6, 0, -6);
+      const IRECT knobRect = centredKnobRect(cell).GetHShifted(-9);
+      const IRECT lRect    = IRECT(
+        knobRect.R + 3.f,
+        knobRect.MH() - kLinkButtonH * 0.5f,
+        knobRect.R + 3.f + kLinkButtonW,
+        knobRect.MH() + kLinkButtonH * 0.5f);
       pGraphics->AttachControl(new IVKnobControl(knobRect, ch0Idx, label, kCurvessorStyle));
-      pGraphics->AttachControl(new IVSwitchControl(lRect, ch0Idx + 2, "L", kCurvessorStyle));
+      pGraphics->AttachControl(new IVSwitchControl(lRect, ch0Idx + 2, "L/R", kCurvessorStyle));
+    };
+
+    // Non-linkable knob with the same compact sizing.
+    auto attachKnob = [&](const IRECT& cell, int paramIdx, const char* label) {
+      pGraphics->AttachControl(
+        new IVKnobControl(centredKnobRect(cell), paramIdx, label, kCurvessorStyle));
+    };
+
+    // Compact switch / tab cell: don't fill the whole grid cell, just a
+    // centred lozenge so adjacent controls breathe.
+    auto switchRect = [&](const IRECT& cell, float w, float h) {
+      return cell.GetCentredInside(w, h);
     };
 
     // Row 0 — globals + filter.
-    pGraphics->AttachControl(new IVSwitchControl(cellAt(0, 0), kMidSide,                "Mid/Side",   kCurvessorStyle));
-    pGraphics->AttachControl(new IVSwitchControl(cellAt(1, 0), kSideChain,              "Sidechain",  kCurvessorStyle));
-    pGraphics->AttachControl(new IVTabSwitchControl(cellAt(2, 0), kOversampling,
+    pGraphics->AttachControl(new IVSwitchControl   (switchRect(cellAt(0, 0), 70, 32), kMidSide,                "Mid/Side",   kCurvessorStyle));
+    pGraphics->AttachControl(new IVSwitchControl   (switchRect(cellAt(1, 0), 70, 32), kSideChain,              "Sidechain",  kCurvessorStyle));
+    pGraphics->AttachControl(new IVTabSwitchControl(switchRect(cellAt(2, 0), 96, 28), kOversampling,
                               {"1x", "2x", "4x", "8x", "16x", "32x"}, "Oversampling", kCurvessorStyle));
-    pGraphics->AttachControl(new IVSwitchControl(cellAt(3, 0), kLinearPhaseOversampling, "Lin Phase", kCurvessorStyle));
+    pGraphics->AttachControl(new IVSwitchControl   (switchRect(cellAt(3, 0), 70, 32), kLinearPhaseOversampling, "Lin Phase", kCurvessorStyle));
     attachLinkable(cellAt(4, 0), kHighPassCutoff_ch0, "HP Cutoff");
-    pGraphics->AttachControl(new IVTabSwitchControl(cellAt(5, 0), kHighPassOrder,
+    pGraphics->AttachControl(new IVTabSwitchControl(switchRect(cellAt(5, 0), 86, 28), kHighPassOrder,
                               {"Off", "6", "12", "18"}, "HP Order", kCurvessorStyle));
-    pGraphics->AttachControl(new IVKnobControl(cellAt(6, 0), kStereoLink,    "Stereo Link", kCurvessorStyle));
-    pGraphics->AttachControl(new IVKnobControl(cellAt(7, 0), kSmoothingTime, "Smoothing",   kCurvessorStyle));
+    attachKnob(cellAt(6, 0), kStereoLink,    "Stereo Link");
+    attachKnob(cellAt(7, 0), kSmoothingTime, "Smoothing");
     // cellAt(8, 0) intentionally empty for now.
 
     // Row 1 — signal-flow params (input → output, plus envelope shape).
