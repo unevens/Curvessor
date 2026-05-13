@@ -116,9 +116,11 @@ oversimple::OversamplingSettings MakeInitialOversamplingSettings()
 #if IPLUG_EDITOR
 
 // =============================================================================
-// SplineControl — IGraphics control that draws Curvessor's gain-curve and
-// lets the user drag the editable knots. First-pass: knot X/Y only (ignores
-// tangent + smoothness), reads ch0 only, no live level/gain overlay.
+// SplineControl — IGraphics control that draws Curvessor's gain curve and
+// lets the user drag the editable knots. Multi-channel: when a knot is
+// unlinked, both ch0 and ch1 positions are drawn and individually
+// draggable. Selecting a knot (mouse-down) rebinds the side-panel knobs
+// for X / Y / Tangent / Link to that knot via Curvessor::SetSelectedKnot.
 // =============================================================================
 class CurvessorSplineControl final : public IControl
 {
@@ -130,6 +132,8 @@ public:
 
   void Draw(IGraphics& g) override
   {
+    auto* del = GetDelegate();
+
     // Background.
     g.FillRect(IColor(255, 18, 22, 28), mRECT);
 
@@ -147,47 +151,69 @@ public:
     // Refresh scalar spline from the live params and count active knots.
     const int numActive = RefreshSplineFromParams();
 
-    // Sample curve at N+1 points along the x range and draw as polyline.
-    const IColor curveCol(255, 80, 160, 240);
-    constexpr int kNumSamples = 240;
-    float prevX = 0.f, prevY = 0.f;
-    for (int i = 0; i <= kNumSamples; ++i) {
-      const double xDb = kKnotMin + (kKnotMax - kKnotMin) * (i / double(kNumSamples));
-      const double yDb = mSpline.process(xDb, 0, numActive);
-      const float sx = DbToScreenX(xDb);
-      const float sy = DbToScreenY(yDb);
-      if (i > 0) {
-        g.DrawLine(curveCol, prevX, prevY, sx, sy, nullptr, 2.f);
-      }
-      prevX = sx;
-      prevY = sy;
-    }
-
-    // Knots — only the editable ones the user can grab.
-    auto* del = GetDelegate();
-    const IColor knotCol(255, 255, 200, 80);
-    const IColor knotHotCol(255, 255, 255, 255);
+    // Detect whether any knot is unlinked — if all are linked, ch0 and ch1
+    // curves overlap so we draw a single curve.
+    bool anyUnlinked = false;
     for (int i = 0; i < kNumKnots; ++i) {
       const int base = kKnot1_enabled + i * 10;
       if (!del->GetParam(base + 0)->Bool()) continue;
-      const float kx = DbToScreenX(del->GetParam(base + 2)->Value());
-      const float ky = DbToScreenY(del->GetParam(base + 3)->Value());
-      const bool hot = (i == mDraggedKnot) || (i == mHoverKnot);
-      g.FillCircle(hot ? knotHotCol : knotCol, kx, ky, kKnotRadius);
-      g.DrawCircle(IColor(255, 0, 0, 0), kx, ky, kKnotRadius, nullptr, 1.f);
+      if (!del->GetParam(base + 1)->Bool()) { anyUnlinked = true; break; }
+    }
+
+    // Curves. Ch0 first (blue-ish), then ch1 on top if needed (red-ish).
+    DrawCurve(g, 0, IColor(255, 80, 160, 240), numActive);
+    if (anyUnlinked) {
+      DrawCurve(g, 1, IColor(255, 240, 100, 100), numActive);
+    }
+
+    // Knots — fill colour per channel; brighter ring for the selected /
+    // hovered / dragged one.
+    auto* plug = static_cast<Curvessor*>(del);
+    const int selKnot = plug->mSelectedKnot;
+    const int selCh   = plug->mSelectedChannel;
+
+    const IColor knotColCh0(255,  80, 160, 240);
+    const IColor knotColCh1(255, 240, 100, 100);
+    const IColor knotHotCol(255, 255, 255, 255);
+    const IColor knotRingCol(255,  10,  12,  16);
+
+    for (int i = 0; i < kNumKnots; ++i) {
+      const int base = kKnot1_enabled + i * 10;
+      if (!del->GetParam(base + 0)->Bool()) continue;
+      const bool linked = del->GetParam(base + 1)->Bool();
+      for (int c = 0; c < 2; ++c) {
+        if (linked && c > 0) break;  // when linked, only one knot per i
+        const int chBase = base + 2 + c * 4;
+        const float kx = DbToScreenX(del->GetParam(chBase + 0)->Value());
+        const float ky = DbToScreenY(del->GetParam(chBase + 1)->Value());
+
+        const bool hot = (i == mDraggedKnot && c == mDraggedChannel)
+                      || (i == mHoverKnot   && c == mHoverChannel);
+        const bool sel = (i == selKnot && c == selCh);
+        const IColor& fill = hot ? knotHotCol : (c == 0 ? knotColCh0 : knotColCh1);
+        const float r = sel ? kKnotRadius + 2.f : kKnotRadius;
+        g.FillCircle(fill, kx, ky, r);
+        g.DrawCircle(knotRingCol, kx, ky, r, nullptr, sel ? 2.f : 1.f);
+      }
     }
 
     // Frame around the editor.
     g.DrawRect(IColor(255, 80, 80, 96), mRECT, nullptr, 1.f);
   }
 
-  void OnMouseDown(float x, float y, const IMouseMod& mod) override
+  void OnMouseDown(float x, float y, const IMouseMod&) override
   {
-    mDraggedKnot = FindKnotAt(x, y);
-    if (mDraggedKnot >= 0) {
-      const int base = kKnot1_enabled + mDraggedKnot * 10;
-      GetDelegate()->BeginInformHostOfParamChangeFromUI(base + 2);  // X_ch0
-      GetDelegate()->BeginInformHostOfParamChangeFromUI(base + 3);  // Y_ch0
+    const KnotHit hit = FindKnotAt(x, y);
+    mDraggedKnot = hit.knot;
+    mDraggedChannel = hit.channel;
+    if (hit.knot >= 0) {
+      const int base = kKnot1_enabled + hit.knot * 10;
+      const int chBase = base + 2 + hit.channel * 4;
+      auto* del = GetDelegate();
+      del->BeginInformHostOfParamChangeFromUI(chBase + 0);  // X_chC
+      del->BeginInformHostOfParamChangeFromUI(chBase + 1);  // Y_chC
+      // Tell the plugin to rebind the side-panel knobs to this knot/channel.
+      static_cast<Curvessor*>(del)->SetSelectedKnot(hit.knot, hit.channel);
     }
     SetDirty(false);
   }
@@ -196,8 +222,9 @@ public:
   {
     if (mDraggedKnot < 0) return;
     const int base = kKnot1_enabled + mDraggedKnot * 10;
-    const int xIdx = base + 2;  // X_ch0
-    const int yIdx = base + 3;  // Y_ch0
+    const int chBase = base + 2 + mDraggedChannel * 4;
+    const int xIdx = chBase + 0;
+    const int yIdx = chBase + 1;
 
     auto* del = GetDelegate();
     const IParam* xParam = del->GetParam(xIdx);
@@ -216,18 +243,22 @@ public:
   {
     if (mDraggedKnot >= 0) {
       const int base = kKnot1_enabled + mDraggedKnot * 10;
-      GetDelegate()->EndInformHostOfParamChangeFromUI(base + 2);
-      GetDelegate()->EndInformHostOfParamChangeFromUI(base + 3);
+      const int chBase = base + 2 + mDraggedChannel * 4;
+      auto* del = GetDelegate();
+      del->EndInformHostOfParamChangeFromUI(chBase + 0);
+      del->EndInformHostOfParamChangeFromUI(chBase + 1);
     }
     mDraggedKnot = -1;
+    mDraggedChannel = 0;
     SetDirty(false);
   }
 
   void OnMouseOver(float x, float y, const IMouseMod&) override
   {
-    const int hovered = FindKnotAt(x, y);
-    if (hovered != mHoverKnot) {
-      mHoverKnot = hovered;
+    const KnotHit hit = FindKnotAt(x, y);
+    if (hit.knot != mHoverKnot || hit.channel != mHoverChannel) {
+      mHoverKnot = hit.knot;
+      mHoverChannel = hit.channel;
       SetDirty(false);
     }
   }
@@ -236,6 +267,7 @@ public:
   {
     if (mHoverKnot != -1) {
       mHoverKnot = -1;
+      mHoverChannel = 0;
       SetDirty(false);
     }
   }
@@ -247,9 +279,13 @@ private:
   static constexpr float kKnotRadius = 6.f;
   static constexpr float kKnotHitRadiusSq = 20.f * 20.f;
 
+  struct KnotHit { int knot; int channel; };
+
   juicy::GuiSpline mSpline{ curvessor::maxNumKnots };
   int mDraggedKnot = -1;
+  int mDraggedChannel = 0;
   int mHoverKnot = -1;
+  int mHoverChannel = 0;
 
   float DbToScreenX(double db) const
   {
@@ -272,22 +308,42 @@ private:
       (mRECT.B - y) / static_cast<double>(mRECT.H()) * (kKnotMax - kKnotMin);
   }
 
-  int FindKnotAt(float x, float y)
+  void DrawCurve(IGraphics& g, int channel, const IColor& col, int numActive)
+  {
+    float prevX = 0.f, prevY = 0.f;
+    constexpr int kNumSamples = 240;
+    for (int i = 0; i <= kNumSamples; ++i) {
+      const double xDb = kKnotMin + (kKnotMax - kKnotMin) * (i / double(kNumSamples));
+      const double yDb = mSpline.process(xDb, channel, numActive);
+      const float sx = DbToScreenX(xDb);
+      const float sy = DbToScreenY(yDb);
+      if (i > 0) g.DrawLine(col, prevX, prevY, sx, sy, nullptr, 2.f);
+      prevX = sx;
+      prevY = sy;
+    }
+  }
+
+  KnotHit FindKnotAt(float x, float y)
   {
     auto* del = GetDelegate();
-    int best = -1;
+    KnotHit best{-1, 0};
     float bestDist2 = kKnotHitRadiusSq;
     for (int i = 0; i < kNumKnots; ++i) {
       const int base = kKnot1_enabled + i * 10;
       if (!del->GetParam(base + 0)->Bool()) continue;
-      const float kx = DbToScreenX(del->GetParam(base + 2)->Value());
-      const float ky = DbToScreenY(del->GetParam(base + 3)->Value());
-      const float dx = kx - x;
-      const float dy = ky - y;
-      const float d2 = dx * dx + dy * dy;
-      if (d2 < bestDist2) {
-        bestDist2 = d2;
-        best = i;
+      const bool linked = del->GetParam(base + 1)->Bool();
+      for (int c = 0; c < 2; ++c) {
+        if (linked && c > 0) break;
+        const int chBase = base + 2 + c * 4;
+        const float kx = DbToScreenX(del->GetParam(chBase + 0)->Value());
+        const float ky = DbToScreenY(del->GetParam(chBase + 1)->Value());
+        const float dx = kx - x;
+        const float dy = ky - y;
+        const float d2 = dx * dx + dy * dy;
+        if (d2 < bestDist2) {
+          bestDist2 = d2;
+          best = {i, c};
+        }
       }
     }
     return best;
@@ -295,12 +351,11 @@ private:
 
   // Populates mSpline from the live param values. Returns count of active
   // knots (fixed anchor + each enabled editable knot). Mirrors the
-  // ProcessBlock-side UpdateSplineFromParams helper, but for one channel.
+  // ProcessBlock-side UpdateSplineFromParams helper, but per-channel.
   int RefreshSplineFromParams()
   {
     auto* del = GetDelegate();
     int n = 0;
-    // Fixed bottom-left anchor.
     for (int c = 0; c < 2; ++c) {
       mSpline.knot(n).x[c] = -96.0;
       mSpline.knot(n).y[c] = -96.0;
@@ -452,9 +507,26 @@ Curvessor::Curvessor(const InstanceInfo& info)
     const IRECT innerBounds = bounds.GetPadded(-10.f);
     const IRECT titleBounds = innerBounds.GetFromTop(40).GetCentredInside(560, 36);
     const IRECT versionBounds = innerBounds.GetFromTRHC(300, 20);
-    // Big spline editor between title and the param grid.
-    const IRECT splineEditorRect =
-      innerBounds.GetReducedFromTop(50).GetFromTop(300).GetCentredInside(720, 300);
+    // Spline editor + knot panel occupy a 920×300 band between title and grid.
+    // Spline takes the left 700, knot panel the right 200, 20 px gutter.
+    const IRECT splinePanelArea =
+      innerBounds.GetReducedFromTop(50).GetFromTop(300).GetCentredInside(920, 300);
+    const IRECT splineEditorRect = splinePanelArea.GetFromLeft(700);
+    const IRECT knotPanelRect    = splinePanelArea.GetFromRight(200);
+
+    // Knot panel: 3 stacked knobs (X / Y / Tan) + a Link toggle row.
+    auto knotPanelRow = [&](int rowIdx, int nRows) {
+      const float rowH = knotPanelRect.H() / nRows;
+      return IRECT(knotPanelRect.L,
+                   knotPanelRect.T + rowIdx * rowH,
+                   knotPanelRect.R,
+                   knotPanelRect.T + (rowIdx + 1) * rowH).GetPadded(-4);
+    };
+    const IRECT knobXRect    = knotPanelRow(0, 4);
+    const IRECT knobYRect    = knotPanelRow(1, 4);
+    const IRECT knobTanRect  = knotPanelRow(2, 4);
+    const IRECT linkRect     = knotPanelRow(3, 4).GetCentredInside(120, 32);
+
     const IRECT metersArea = innerBounds.GetFromBottom(90).GetPadded(-5);
     const IRECT levelMeterRect = metersArea.GetFromLeft(metersArea.W() * 0.5f).GetPadded(-4);
     const IRECT gainMeterRect  = metersArea.GetFromRight(metersArea.W() * 0.5f).GetPadded(-4);
@@ -466,6 +538,10 @@ Curvessor::Curvessor(const InstanceInfo& info)
       pGraphics->GetControlWithTag(kCtrlTagSplineEditor)->SetTargetAndDrawRECTs(splineEditorRect);
       pGraphics->GetControlWithTag(kCtrlTagLevelMeter)->SetTargetAndDrawRECTs(levelMeterRect);
       pGraphics->GetControlWithTag(kCtrlTagGainMeter)->SetTargetAndDrawRECTs(gainMeterRect);
+      if (mKnotPanelKnobX)   mKnotPanelKnobX  ->SetTargetAndDrawRECTs(knobXRect);
+      if (mKnotPanelKnobY)   mKnotPanelKnobY  ->SetTargetAndDrawRECTs(knobYRect);
+      if (mKnotPanelKnobTan) mKnotPanelKnobTan->SetTargetAndDrawRECTs(knobTanRect);
+      if (mKnotPanelLink)    mKnotPanelLink   ->SetTargetAndDrawRECTs(linkRect);
       return;
     }
 
@@ -487,6 +563,18 @@ Curvessor::Curvessor(const InstanceInfo& info)
     pGraphics->AttachControl(
       new CurvessorSplineControl(splineEditorRect),
       kCtrlTagSplineEditor);
+
+    // Knot side-panel: knobs for X / Y / Tangent on the selected knot, plus
+    // a Link toggle so the user can split ch0 / ch1. Initial param indices
+    // bind to mSelectedKnot's default-active knot 4 (i=3) ch0.
+    {
+      const int base = kKnot1_enabled + mSelectedKnot * 10;
+      const int chBase = base + 2 + mSelectedChannel * 4;
+      mKnotPanelKnobX   = pGraphics->AttachControl(new IVKnobControl(knobXRect,   chBase + 0, "X (dB)"));
+      mKnotPanelKnobY   = pGraphics->AttachControl(new IVKnobControl(knobYRect,   chBase + 1, "Y (dB)"));
+      mKnotPanelKnobTan = pGraphics->AttachControl(new IVKnobControl(knobTanRect, chBase + 2, "Tangent"));
+      mKnotPanelLink    = pGraphics->AttachControl(new IVSwitchControl(linkRect, base + 1, "Link L/R"));
+    }
 
     // Param grid sits between the spline editor and meters. 6 cols × 3 rows.
     const IRECT gridArea =
@@ -921,4 +1009,43 @@ void Curvessor::OnIdle()
 {
   mLevelMeterSender.TransmitData(*this);
   mGainMeterSender.TransmitData(*this);
+
+#if IPLUG_EDITOR
+  // Force a periodic repaint of the spline editor so it picks up external
+  // param changes — host automation, undo, edits via the knot-panel knobs,
+  // anything that isn't a drag inside the spline editor itself. Cheap;
+  // SetDirty just marks the control region invalid for the next frame.
+  if (auto* ui = GetUI()) {
+    if (auto* ctrl = ui->GetControlWithTag(kCtrlTagSplineEditor)) {
+      ctrl->SetDirty(false);
+    }
+  }
+#endif
 }
+
+#if IPLUG_EDITOR
+void Curvessor::SetSelectedKnot(int knotIdx, int channel)
+{
+  if (knotIdx < 0) return;
+  if (knotIdx == mSelectedKnot && channel == mSelectedChannel) return;
+
+  mSelectedKnot = knotIdx;
+  mSelectedChannel = channel;
+
+  const int base   = kKnot1_enabled + knotIdx * 10;
+  const int chBase = base + 2 + channel * 4;
+
+  // Rebind the side-panel controls to the freshly-selected knot's params.
+  // SetParamIdx swaps the index in mVals and calls SetDirty(false); iPlug2
+  // pulls the new value into the control's internal state on the next
+  // SetValueFromDelegate cycle, so the knob shows the correct reading.
+  if (mKnotPanelKnobX)   mKnotPanelKnobX  ->SetParamIdx(chBase + 0);
+  if (mKnotPanelKnobY)   mKnotPanelKnobY  ->SetParamIdx(chBase + 1);
+  if (mKnotPanelKnobTan) mKnotPanelKnobTan->SetParamIdx(chBase + 2);
+  if (mKnotPanelLink)    mKnotPanelLink   ->SetParamIdx(base + 1);
+
+  if (auto* ui = GetUI()) {
+    ui->SetAllControlsDirty();
+  }
+}
+#endif

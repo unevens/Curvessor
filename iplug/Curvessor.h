@@ -158,4 +158,23 @@ private:
   ISender<2> mLevelMeterSender;
   ISender<2> mGainMeterSender;
 #endif
+
+public:
+  // Selected-knot state for the side panel. Updated by the spline editor on
+  // click / drag and read by Draw to highlight + by SetSelectedKnot to rebind
+  // the panel knobs.
+  int mSelectedKnot = 3;     // i=3..6 are enabled by default; pick the first.
+  int mSelectedChannel = 0;
+
+  // Rebind the side-panel knot knobs to the selected knot's params. Called
+  // from the spline editor's OnMouseDown.
+  void SetSelectedKnot(int knotIdx, int channel);
+
+private:
+  // Pointers to the side-panel controls so SetSelectedKnot can rebind them.
+  // Populated when mLayoutFunc attaches them; null until then.
+  iplug::igraphics::IControl* mKnotPanelKnobX = nullptr;
+  iplug::igraphics::IControl* mKnotPanelKnobY = nullptr;
+  iplug::igraphics::IControl* mKnotPanelKnobTan = nullptr;
+  iplug::igraphics::IControl* mKnotPanelLink = nullptr;
 };
