@@ -116,6 +116,65 @@ oversimple::OversamplingSettings MakeInitialOversamplingSettings()
 #if IPLUG_EDITOR
 
 // =============================================================================
+// Visual palette — "rack on a spacestation". Dark panel chassis, LCD-style
+// spline editor with a low-contrast teal grid. The actual chassis bitmap is
+// expected to be a future asset; these colours are picked to read well over
+// either a flat dark fill or such a bitmap.
+// =============================================================================
+
+// Chassis (panel) — used when no background image is loaded yet.
+static const IColor kPanelBg          (255,  14,  18,  24);
+static const IColor kPanelFrame       (255,  44,  56,  68);
+
+// LCD area (spline editor + meters).
+static const IColor kLcdBg            (255,   6,  12,  16);
+static const IColor kLcdFrame         (255,  60,  90, 105);
+static const IColor kLcdGridMajor     (255,  44,  72,  88);
+static const IColor kLcdGridMinor     (255,  22,  38,  48);
+static const IColor kLcdAxisLabel     (255,  90, 140, 158);
+static const IColor kLcdIdentityLine  (160,  60,  90, 105);
+
+// Spline content.
+static const IColor kLcdCurveCh0      (255,  80, 200, 230);  // bright cyan
+static const IColor kLcdCurveCh1      (255, 240, 170,  90);  // warm amber
+static const IColor kLcdKnotCh0       (255, 150, 220, 245);
+static const IColor kLcdKnotCh1       (255, 255, 200, 130);
+static const IColor kLcdKnotGhostCh0  (130,  80, 160, 200);
+static const IColor kLcdKnotGhostCh1  (130, 200, 130,  80);
+static const IColor kLcdKnotRing      (255,  10,  16,  22);
+static const IColor kLcdSelectedHalo  (255, 255, 255, 255);
+static const IColor kLcdTangentLine   (220, 220, 235, 200);
+static const IColor kLcdTangentHandle (255, 250, 220, 100);
+static const IColor kLcdLevelDotCh0   (255, 200, 240, 255);
+static const IColor kLcdLevelDotCh1   (255, 255, 220, 180);
+static const IColor kLcdGrLineCh0     (190, 130, 210, 240);
+static const IColor kLcdGrLineCh1     (190, 245, 190, 130);
+
+// Text styles.
+static const IText kTitleText(20, IColor(255, 200, 220, 230),
+                              nullptr, EAlign::Center);
+static const IText kVersionText(10, IColor(255, 110, 140, 155),
+                                nullptr, EAlign::Far);
+static const IText kLcdAxisLabelText(10, kLcdAxisLabel, nullptr, EAlign::Center);
+static const IText kLcdAxisLabelTextLeft(10, kLcdAxisLabel, nullptr, EAlign::Near);
+
+// Shared IVStyle for every Curvessor panel control — knobs, switches,
+// tabs, meters. Dark base, cyan accents, slim 1px frames.
+static const IVStyle kCurvessorStyle = DEFAULT_STYLE
+  .WithColor(kBG, IColor(255,  20,  26,  32))
+  .WithColor(kFG, IColor(255,  60, 110, 130))
+  .WithColor(kPR, IColor(255,  80, 200, 230))
+  .WithColor(kFR, IColor(255,  60,  85, 100))
+  .WithColor(kHL, IColor(255, 120, 180, 200))
+  .WithColor(kSH, IColor(255,   4,   8,  12))
+  .WithColor(kX1, IColor(255, 240, 170,  90))
+  .WithFrameThickness(1.f)
+  .WithLabelText(IText(11, IColor(255, 170, 200, 215),
+                       nullptr, EAlign::Center))
+  .WithValueText(IText(10, IColor(255, 190, 215, 225),
+                       nullptr, EAlign::Center));
+
+// =============================================================================
 // SplineControl — IGraphics control that draws Curvessor's gain curve and
 // lets the user drag the editable knots. Multi-channel: when a knot is
 // unlinked, both ch0 and ch1 positions are drawn and individually
@@ -134,19 +193,10 @@ public:
   {
     auto* del = GetDelegate();
 
-    // Background.
-    g.FillRect(IColor(255, 18, 22, 28), mRECT);
+    // LCD chassis.
+    g.FillRect(kLcdBg, mRECT);
 
-    // Grid (8 divisions on each axis, so each cell is ~12.75 dB).
-    const IColor gridCol(255, 50, 56, 64);
-    constexpr int kGridDivs = 8;
-    for (int i = 1; i < kGridDivs; ++i) {
-      const float t = static_cast<float>(i) / kGridDivs;
-      const float gx = mRECT.L + t * mRECT.W();
-      const float gy = mRECT.B - t * mRECT.H();
-      g.DrawLine(gridCol, gx, mRECT.T, gx, mRECT.B, nullptr, 1.f);
-      g.DrawLine(gridCol, mRECT.L, gy, mRECT.R, gy, nullptr, 1.f);
-    }
+    DrawDbGrid(g);
 
     // Refresh scalar spline from the live params and count active knots.
     const int numActive = RefreshSplineFromParams();
@@ -160,34 +210,21 @@ public:
       if (!del->GetParam(base + 1)->Bool()) { anyUnlinked = true; break; }
     }
 
-    // Curves. Ch0 first (blue-ish), then ch1 on top if needed (red-ish).
-    DrawCurve(g, 0, IColor(255, 80, 160, 240), numActive);
-    if (anyUnlinked) {
-      DrawCurve(g, 1, IColor(255, 240, 100, 100), numActive);
-    }
+    // Curves — ch0 first, then ch1 on top if any knot is split.
+    DrawCurve(g, 0, kLcdCurveCh0, numActive);
+    if (anyUnlinked) DrawCurve(g, 1, kLcdCurveCh1, numActive);
 
-    // Knots — fill colour per channel; brighter ring for the selected /
-    // hovered / dragged one.
+    // Knots.
     auto* plug = static_cast<Curvessor*>(del);
     const int selKnot = plug->mSelectedKnot;
     const int selCh   = plug->mSelectedChannel;
-
-    const IColor knotColCh0(255,  80, 160, 240);
-    const IColor knotColCh1(255, 240, 100, 100);
-    const IColor knotHotCol(255, 255, 255, 255);
-    const IColor knotRingCol(255,  10,  12,  16);
-
-    // Faded "ghost" colours for disabled knots, so the user can still see
-    // their stored positions and double-click to re-enable them.
-    const IColor ghostColCh0(120,  80, 160, 240);
-    const IColor ghostColCh1(120, 240, 100, 100);
 
     for (int i = 0; i < kNumKnots; ++i) {
       const int base = kKnot1_enabled + i * 10;
       const bool enabled = del->GetParam(base + 0)->Bool();
       const bool linked  = del->GetParam(base + 1)->Bool();
       for (int c = 0; c < 2; ++c) {
-        if (linked && c > 0) break;  // when linked, only one knot per i
+        if (linked && c > 0) break;
         const int chBase = base + 2 + c * 4;
         const float kx = DbToScreenX(del->GetParam(chBase + 0)->Value());
         const float ky = DbToScreenY(del->GetParam(chBase + 1)->Value());
@@ -198,24 +235,21 @@ public:
         const bool sel = enabled && (i == selKnot && c == selCh);
 
         if (enabled) {
-          const IColor& fill = hot ? knotHotCol : (c == 0 ? knotColCh0 : knotColCh1);
+          const IColor& fill = hot ? kLcdSelectedHalo
+                                   : (c == 0 ? kLcdKnotCh0 : kLcdKnotCh1);
           const float r = sel ? kKnotRadius + 2.f : kKnotRadius;
           g.FillCircle(fill, kx, ky, r);
-          g.DrawCircle(knotRingCol, kx, ky, r, nullptr, sel ? 2.f : 1.f);
+          g.DrawCircle(kLcdKnotRing, kx, ky, r, nullptr, sel ? 2.f : 1.f);
         } else {
-          // Ghost: smaller, translucent, no inner ring. Still hit-testable
-          // by FindKnotAt(includeDisabled=true) for double-click re-enable.
-          const IColor& fill = (c == 0) ? ghostColCh0 : ghostColCh1;
+          // Ghost: smaller, translucent. Still hit-testable for double-
+          // click re-enable via FindKnotAt(includeDisabled=true).
+          const IColor& fill = (c == 0) ? kLcdKnotGhostCh0 : kLcdKnotGhostCh1;
           g.FillCircle(fill, kx, ky, kKnotRadius - 1.f);
         }
       }
     }
 
-    // Tangent handle on the selected knot. Only one knot's tangent handle
-    // is shown at a time to keep the editor uncluttered; the user picks a
-    // knot with a click, then drags its tangent. When the knot is linked,
-    // the handle controls ch0's tangent (ch1's is ignored by the DSP path
-    // when linked).
+    // Tangent handle on the currently-selected knot.
     if (selKnot >= 0) {
       const int selBase = kKnot1_enabled + selKnot * 10;
       if (del->GetParam(selBase + 0)->Bool()) {
@@ -224,39 +258,26 @@ public:
       }
     }
 
-    // Live envelope-follower "current input" dot per channel. The amp value
-    // arrives via mLevelMeterSender → OnMsgFromDelegate; convert back to dB
-    // here so we can place it on the curve's X axis. The dot's Y is the
-    // spline's response at that X — i.e. exactly where the compressor is
-    // currently acting. The vertical line from the dot to the y=x identity
-    // line shows the actual gain correction in dB at this input level.
+    // Live "current input" dot per channel + GR vertical line to identity.
     for (int c = 0; c < 2; ++c) {
       const float amp = mCurrentLevelAmp[c];
-      if (amp <= 0.f) continue;  // pre-roll: env is silence, skip
+      if (amp <= 0.f) continue;
       const double dB = 20.0 * std::log10(static_cast<double>(amp));
       if (dB < kKnotMin || dB > kKnotMax) continue;
       const double yDb = mSpline.process(dB, c, numActive);
       const float dx = DbToScreenX(dB);
       const float dy = DbToScreenY(yDb);
-      const float identityY = DbToScreenY(dB);  // y == x at this input
+      const float identityY = DbToScreenY(dB);
 
-      // Gain-reduction (or expansion) line: from the curve point vertically
-      // to the identity line. Slightly translucent so the curve underneath
-      // stays visible.
-      const IColor grCol = (c == 0)
-        ? IColor(180, 200, 230, 255)
-        : IColor(180, 255, 200, 200);
+      const IColor grCol  = (c == 0) ? kLcdGrLineCh0  : kLcdGrLineCh1;
+      const IColor dotCol = (c == 0) ? kLcdLevelDotCh0 : kLcdLevelDotCh1;
       g.DrawLine(grCol, dx, dy, dx, identityY, nullptr, 2.f);
-
-      const IColor dotCol = (c == 0)
-        ? IColor(255, 200, 230, 255)
-        : IColor(255, 255, 200, 200);
       g.FillCircle(dotCol, dx, dy, 4.f);
-      g.DrawCircle(IColor(255, 10, 12, 16), dx, dy, 4.f, nullptr, 1.f);
+      g.DrawCircle(kLcdKnotRing, dx, dy, 4.f, nullptr, 1.f);
     }
 
-    // Frame around the editor.
-    g.DrawRect(IColor(255, 80, 80, 96), mRECT, nullptr, 1.f);
+    // LCD frame.
+    g.DrawRect(kLcdFrame, mRECT, nullptr, 1.f);
   }
 
   void OnMouseDown(float x, float y, const IMouseMod& mod) override
@@ -477,6 +498,56 @@ private:
     }
   }
 
+  // LCD-style dB grid with major lines at 24 dB intervals and minor lines
+  // halfway between. Labels along the bottom (X) and the left (Y) edges in
+  // a low-contrast teal so they don't compete with the curves. The y = x
+  // identity diagonal is drawn over the grid as a faint reference.
+  void DrawDbGrid(IGraphics& g)
+  {
+    static constexpr int kMajor[] = { -96, -72, -48, -24, 0 };
+    static constexpr int kMinor[] = { -84, -60, -36, -12 };
+
+    // Minor lines first so the major lines paint on top.
+    for (int db : kMinor) {
+      const float xs = DbToScreenX(db);
+      const float ys = DbToScreenY(db);
+      g.DrawLine(kLcdGridMinor, xs, mRECT.T + 1, xs, mRECT.B - 1, nullptr, 1.f);
+      g.DrawLine(kLcdGridMinor, mRECT.L + 1, ys, mRECT.R - 1, ys, nullptr, 1.f);
+    }
+
+    for (int db : kMajor) {
+      const float xs = DbToScreenX(db);
+      const float ys = DbToScreenY(db);
+      g.DrawLine(kLcdGridMajor, xs, mRECT.T + 1, xs, mRECT.B - 1, nullptr, 1.f);
+      g.DrawLine(kLcdGridMajor, mRECT.L + 1, ys, mRECT.R - 1, ys, nullptr, 1.f);
+
+      char buf[8];
+      std::snprintf(buf, sizeof(buf), "%d", db);
+
+      // X-axis label, bottom edge, slightly inset.
+      const IRECT xLabel(xs - 18.f, mRECT.B - 15.f, xs + 18.f, mRECT.B - 3.f);
+      g.DrawText(kLcdAxisLabelText, buf, xLabel);
+
+      // Y-axis label, left edge. Skip the bottom-left corner where the two
+      // axes overlap visually (-96 vs -96 reads as a single label).
+      if (db != -96) {
+        const IRECT yLabel(mRECT.L + 3.f, ys - 7.f, mRECT.L + 32.f, ys + 7.f);
+        g.DrawText(kLcdAxisLabelTextLeft, buf, yLabel);
+      }
+    }
+
+    // y = x identity diagonal — a "no-change" reference for the user when
+    // reading the curve. Faint so the actual curve is clearly the figure.
+    const float topRightX = DbToScreenX(kKnotMax);
+    const float topRightY = DbToScreenY(kKnotMax);
+    const float bottomLeftX = DbToScreenX(kKnotMin);
+    const float bottomLeftY = DbToScreenY(kKnotMin);
+    g.DrawLine(kLcdIdentityLine,
+               bottomLeftX, bottomLeftY,
+               topRightX,   topRightY,
+               nullptr, 1.f);
+  }
+
   // Small param-write helpers — wrap Begin/Send/End for a single-shot write.
   void SetParamFromUI(int paramIdx, double clampedValue)
   {
@@ -595,17 +666,14 @@ private:
     float hx, hy;
     TangentHandleScreenPos(knotIdx, channel, hx, hy);
 
-    const IColor lineCol(200, 220, 220, 230);
-    g.DrawLine(lineCol, kx, ky, hx, hy, nullptr, 1.f);
+    g.DrawLine(kLcdTangentLine, kx, ky, hx, hy, nullptr, 1.f);
 
     const bool isDragging = (knotIdx == mDraggedKnot
                           && channel == mDraggedChannel
                           && mDraggingTangent);
-    const IColor handleCol = isDragging
-      ? IColor(255, 255, 255, 255)
-      : IColor(255, 200, 220, 255);
+    const IColor handleCol = isDragging ? kLcdSelectedHalo : kLcdTangentHandle;
     g.FillCircle(handleCol, hx, hy, kTangentHandleRadius);
-    g.DrawCircle(IColor(255, 10, 12, 16), hx, hy, kTangentHandleRadius, nullptr, 1.f);
+    g.DrawCircle(kLcdKnotRing, hx, hy, kTangentHandleRadius, nullptr, 1.f);
   }
 
   // Populates mSpline from the live param values. Returns count of active
@@ -762,21 +830,26 @@ Curvessor::Curvessor(const InstanceInfo& info)
   };
 
   mLayoutFunc = [&](IGraphics* pGraphics) {
+    // Layout for 1024×640: title strip on top, spline editor + knot panel
+    // band, 2-row param grid, slim meters at the bottom.
     const IRECT bounds = pGraphics->GetBounds();
     const IRECT innerBounds = bounds.GetPadded(-10.f);
-    const IRECT titleBounds = innerBounds.GetFromTop(40).GetCentredInside(560, 36);
-    const IRECT versionBounds = innerBounds.GetFromTRHC(300, 20);
-    // Spline editor + knot panel occupy a 920×300 band between title and grid.
-    // Spline takes the left 700, knot panel the right 200, 20 px gutter.
+
+    // Top strip: title centred, version in the top-right corner.
+    const IRECT topStrip = innerBounds.GetFromTop(28);
+    const IRECT titleBounds   = topStrip.GetCentredInside(360, 26);
+    const IRECT versionBounds = topStrip.GetFromRight(240);
+
+    // Spline + knot-panel band, 312 px tall starting just below the title.
     const IRECT splinePanelArea =
-      innerBounds.GetReducedFromTop(50).GetFromTop(300).GetCentredInside(920, 300);
-    const IRECT splineEditorRect = splinePanelArea.GetFromLeft(700);
+      innerBounds.GetReducedFromTop(36).GetFromTop(312);
+    const IRECT splineEditorRect = splinePanelArea.GetReducedFromRight(208);
     const IRECT knotPanelRect    = splinePanelArea.GetFromRight(200);
 
-    // Knot panel: 2×2 grid of knobs (X / Y top row, Tangent / Smoothness
-    // bottom row) plus a Link L/R toggle along the bottom edge.
-    const IRECT knotPanelKnobsArea = knotPanelRect.GetReducedFromBottom(56);
-    const IRECT knotPanelLinkArea  = knotPanelRect.GetFromBottom(56);
+    // Knot panel: 2×2 knob grid (X/Y top row, Tan/Smooth bottom row) + a
+    // Link L/R toggle along the bottom.
+    const IRECT knotPanelKnobsArea = knotPanelRect.GetReducedFromBottom(44);
+    const IRECT knotPanelLinkArea  = knotPanelRect.GetFromBottom(44);
     auto knobCell = [&](int col, int row) {
       const float w = knotPanelKnobsArea.W() / 2.f;
       const float h = knotPanelKnobsArea.H() / 2.f;
@@ -789,11 +862,24 @@ Curvessor::Curvessor(const InstanceInfo& info)
     const IRECT knobYRect      = knobCell(1, 0);
     const IRECT knobTanRect    = knobCell(0, 1);
     const IRECT knobSmoothRect = knobCell(1, 1);
-    const IRECT linkRect       = knotPanelLinkArea.GetCentredInside(140, 32);
+    const IRECT linkRect       = knotPanelLinkArea.GetCentredInside(140, 28);
 
-    const IRECT metersArea = innerBounds.GetFromBottom(90).GetPadded(-5);
-    const IRECT levelMeterRect = metersArea.GetFromLeft(metersArea.W() * 0.5f).GetPadded(-4);
-    const IRECT gainMeterRect  = metersArea.GetFromRight(metersArea.W() * 0.5f).GetPadded(-4);
+    // 2-row param grid below the spline band, 9 cells per row.
+    const IRECT gridArea =
+      innerBounds.GetReducedFromTop(354).GetReducedFromBottom(38);
+    constexpr int kGridCols = 9;
+    constexpr int kGridRows = 2;
+    auto cellAt = [&](int col, int row) {
+      const float colW = gridArea.W() / kGridCols;
+      const float rowH = gridArea.H() / kGridRows;
+      return IRECT(gridArea.L + col * colW, gridArea.T + row * rowH,
+                   gridArea.L + (col + 1) * colW, gridArea.T + (row + 1) * rowH).GetPadded(-4);
+    };
+
+    // Meters in a slim strip along the bottom edge.
+    const IRECT metersArea     = innerBounds.GetFromBottom(32);
+    const IRECT levelMeterRect = metersArea.GetFromLeft(metersArea.W() * 0.5f).GetPadded(-4, 0, -4, 0);
+    const IRECT gainMeterRect  = metersArea.GetFromRight(metersArea.W() * 0.5f).GetPadded(-4, 0, -4, 0);
 
     if (pGraphics->NControls()) {
       pGraphics->GetBackgroundControl()->SetTargetAndDrawRECTs(bounds);
@@ -813,92 +899,76 @@ Curvessor::Curvessor(const InstanceInfo& info)
     pGraphics->SetLayoutOnResize(true);
     pGraphics->AttachCornerResizer(EUIResizerMode::Size, true);
     pGraphics->LoadFont("Roboto-Regular", ROBOTO_FN);
-    pGraphics->AttachPanelBackground(COLOR_LIGHT_GRAY);
+    // Dark chassis. A textured background bitmap (rack-on-spacestation art)
+    // can replace this later via AttachBackground; the rest of the palette
+    // is designed to read over either.
+    pGraphics->AttachPanelBackground(kPanelBg);
+
     pGraphics->AttachControl(
-      new ITextControl(titleBounds, "Curvessor (iPlug2 port — placeholder UI)", IText(22)),
+      new ITextControl(titleBounds, "CURVESSOR", kTitleText),
       kCtrlTagTitle);
     WDL_String buildInfoStr;
     GetBuildInfoStr(buildInfoStr, __DATE__, __TIME__);
     pGraphics->AttachControl(
-      new ITextControl(versionBounds, buildInfoStr.Get(),
-                       DEFAULT_TEXT.WithAlign(EAlign::Far)),
+      new ITextControl(versionBounds, buildInfoStr.Get(), kVersionText),
       kCtrlTagVersionNumber);
 
-    // Spline curve editor — drag the editable knots to shape the gain curve.
     pGraphics->AttachControl(
       new CurvessorSplineControl(splineEditorRect),
       kCtrlTagSplineEditor);
 
-    // Knot side-panel: knobs for X / Y / Tangent on the selected knot, plus
-    // a Link toggle so the user can split ch0 / ch1. Initial param indices
-    // bind to mSelectedKnot's default-active knot 4 (i=3) ch0.
+    // Knot side-panel.
     {
       const int base = kKnot1_enabled + mSelectedKnot * 10;
       const int chBase = base + 2 + mSelectedChannel * 4;
-      mKnotPanelKnobX          = pGraphics->AttachControl(new IVKnobControl(knobXRect,      chBase + 0, "X (dB)"));
-      mKnotPanelKnobY          = pGraphics->AttachControl(new IVKnobControl(knobYRect,      chBase + 1, "Y (dB)"));
-      mKnotPanelKnobTan        = pGraphics->AttachControl(new IVKnobControl(knobTanRect,    chBase + 2, "Tangent"));
-      mKnotPanelKnobSmoothness = pGraphics->AttachControl(new IVKnobControl(knobSmoothRect, chBase + 3, "Smooth"));
-      mKnotPanelLink           = pGraphics->AttachControl(new IVSwitchControl(linkRect, base + 1, "Link L/R"));
+      mKnotPanelKnobX          = pGraphics->AttachControl(new IVKnobControl(knobXRect,      chBase + 0, "X (dB)",   kCurvessorStyle));
+      mKnotPanelKnobY          = pGraphics->AttachControl(new IVKnobControl(knobYRect,      chBase + 1, "Y (dB)",   kCurvessorStyle));
+      mKnotPanelKnobTan        = pGraphics->AttachControl(new IVKnobControl(knobTanRect,    chBase + 2, "Tangent",  kCurvessorStyle));
+      mKnotPanelKnobSmoothness = pGraphics->AttachControl(new IVKnobControl(knobSmoothRect, chBase + 3, "Smooth",   kCurvessorStyle));
+      mKnotPanelLink           = pGraphics->AttachControl(new IVSwitchControl(linkRect, base + 1, "Link L/R", kCurvessorStyle));
     }
 
-    // Param grid sits between the spline editor and meters. 6 cols × 3 rows.
-    const IRECT gridArea =
-      innerBounds.GetReducedFromTop(360).GetReducedFromBottom(100);
-    constexpr int kGridCols = 6;
-    constexpr int kGridRows = 3;
-    auto cellAt = [&](int col, int row) {
-      const float colW = gridArea.W() / kGridCols;
-      const float rowH = gridArea.H() / kGridRows;
-      return IRECT(gridArea.L + col * colW, gridArea.T + row * rowH,
-                   gridArea.L + (col + 1) * colW, gridArea.T + (row + 1) * rowH).GetPadded(-6);
-    };
-
-    // A linkable pair shows up as a knob on ch0 plus a small "L" toggle bound
-    // to the _is_linked bool. The DSP reads ch1 from ch0 whenever linked is
-    // true (see GetLinkable).
+    // Linkable pair: knob on ch0 + small "L" toggle bound to _is_linked.
     auto attachLinkable = [&](const IRECT& cell, int ch0Idx, const char* label) {
-      const IRECT knobRect = cell.GetReducedFromRight(28);
-      const IRECT linkRect = cell.GetFromRight(24).GetPadded(0, -10, 0, -10);
-      pGraphics->AttachControl(new IVKnobControl(knobRect, ch0Idx, label));
-      pGraphics->AttachControl(new IVSwitchControl(linkRect, ch0Idx + 2, "L"));
+      const IRECT knobRect = cell.GetReducedFromRight(20);
+      const IRECT lRect   = cell.GetFromRight(18).GetPadded(0, -6, 0, -6);
+      pGraphics->AttachControl(new IVKnobControl(knobRect, ch0Idx, label, kCurvessorStyle));
+      pGraphics->AttachControl(new IVSwitchControl(lRect, ch0Idx + 2, "L", kCurvessorStyle));
     };
 
-    // Row 0 — globals.
-    pGraphics->AttachControl(new IVSwitchControl(cellAt(0, 0), kMidSide, "Mid-Side"));
-    pGraphics->AttachControl(new IVSwitchControl(cellAt(1, 0), kSideChain, "Sidechain"));
+    // Row 0 — globals + filter.
+    pGraphics->AttachControl(new IVSwitchControl(cellAt(0, 0), kMidSide,                "Mid/Side",   kCurvessorStyle));
+    pGraphics->AttachControl(new IVSwitchControl(cellAt(1, 0), kSideChain,              "Sidechain",  kCurvessorStyle));
     pGraphics->AttachControl(new IVTabSwitchControl(cellAt(2, 0), kOversampling,
-                              {"1x", "2x", "4x", "8x", "16x", "32x"}, "Oversampling"));
-    pGraphics->AttachControl(new IVSwitchControl(cellAt(3, 0), kLinearPhaseOversampling, "Lin Phase"));
-    pGraphics->AttachControl(new IVKnobControl(cellAt(4, 0), kStereoLink, "Stereo Link"));
-    pGraphics->AttachControl(new IVKnobControl(cellAt(5, 0), kSmoothingTime, "Smoothing"));
+                              {"1x", "2x", "4x", "8x", "16x", "32x"}, "Oversampling", kCurvessorStyle));
+    pGraphics->AttachControl(new IVSwitchControl(cellAt(3, 0), kLinearPhaseOversampling, "Lin Phase", kCurvessorStyle));
+    attachLinkable(cellAt(4, 0), kHighPassCutoff_ch0, "HP Cutoff");
+    pGraphics->AttachControl(new IVTabSwitchControl(cellAt(5, 0), kHighPassOrder,
+                              {"Off", "6", "12", "18"}, "HP Order", kCurvessorStyle));
+    pGraphics->AttachControl(new IVKnobControl(cellAt(6, 0), kStereoLink,    "Stereo Link", kCurvessorStyle));
+    pGraphics->AttachControl(new IVKnobControl(cellAt(7, 0), kSmoothingTime, "Smoothing",   kCurvessorStyle));
+    // cellAt(8, 0) intentionally empty for now.
 
-    // Row 1 — input/output gain, wet, feedback, attack, release.
+    // Row 1 — signal-flow params (input → output, plus envelope shape).
     attachLinkable(cellAt(0, 1), kInputGain_ch0,      "In Gain");
     attachLinkable(cellAt(1, 1), kOutputGain_ch0,     "Out Gain");
     attachLinkable(cellAt(2, 1), kWet_ch0,            "Wet");
     attachLinkable(cellAt(3, 1), kFeedbackAmount_ch0, "Feedback");
     attachLinkable(cellAt(4, 1), kAttack_ch0,         "Attack");
     attachLinkable(cellAt(5, 1), kRelease_ch0,        "Release");
-
-    // Row 2 — delays, RMS, high-pass.
-    attachLinkable(cellAt(0, 2), kAttackDelay_ch0,    "A Delay");
-    attachLinkable(cellAt(1, 2), kReleaseDelay_ch0,   "R Delay");
-    attachLinkable(cellAt(2, 2), kRMSTime_ch0,        "RMS Time");
-    attachLinkable(cellAt(3, 2), kHighPassCutoff_ch0, "HP Cutoff");
-    pGraphics->AttachControl(new IVTabSwitchControl(cellAt(4, 2), kHighPassOrder,
-                              {"Off", "6", "12", "18"}, "HP Order"));
-    // cellAt(5, 2) intentionally empty — leaves room for a future "HP type" or
-    // similar control without re-laying out the grid.
+    attachLinkable(cellAt(6, 1), kAttackDelay_ch0,    "A Delay");
+    attachLinkable(cellAt(7, 1), kReleaseDelay_ch0,   "R Delay");
+    attachLinkable(cellAt(8, 1), kRMSTime_ch0,        "RMS Time");
 
     // VU meters fed by ISender packets pushed from ProcessBlock.
+    const IVStyle meterStyle = kCurvessorStyle.WithDrawFrame(false);
     pGraphics->AttachControl(
-      new IVMeterControl<2>(levelMeterRect, "Level (dB)", DEFAULT_STYLE,
+      new IVMeterControl<2>(levelMeterRect, "Level", meterStyle,
                             EDirection::Horizontal, {"L", "R"}, 0,
                             IVMeterControl<2>::EResponse::Log, -60.f, 6.f),
       kCtrlTagLevelMeter);
     pGraphics->AttachControl(
-      new IVMeterControl<2>(gainMeterRect, "Gain (dB)", DEFAULT_STYLE,
+      new IVMeterControl<2>(gainMeterRect, "Gain", meterStyle,
                             EDirection::Horizontal, {"L", "R"}, 0,
                             IVMeterControl<2>::EResponse::Log, -60.f, 6.f),
       kCtrlTagGainMeter);
