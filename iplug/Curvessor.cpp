@@ -245,9 +245,23 @@ public:
     g.DrawRect(IColor(255, 80, 80, 96), mRECT, nullptr, 1.f);
   }
 
-  void OnMouseDown(float x, float y, const IMouseMod&) override
+  void OnMouseDown(float x, float y, const IMouseMod& mod) override
   {
     auto* del = GetDelegate();
+
+    // Right-click: toggle a knot.
+    //   - on an existing knot → disable it
+    //   - on empty area → enable the first available disabled slot at (x, y)
+    if (mod.R) {
+      const KnotHit hit = FindKnotAt(x, y);
+      if (hit.knot >= 0) {
+        DisableKnot(hit.knot);
+      } else {
+        EnableKnotAt(x, y);
+      }
+      SetDirty(false);
+      return;
+    }
 
     // Tangent handle on the currently-selected knot takes priority — it
     // overlaps the knot area visually but the hit is the smaller dot.
@@ -432,6 +446,64 @@ private:
       prevX = sx;
       prevY = sy;
     }
+  }
+
+  // Small param-write helpers — wrap Begin/Send/End for a single-shot write.
+  void SetParamFromUI(int paramIdx, double clampedValue)
+  {
+    auto* del = GetDelegate();
+    const IParam* p = del->GetParam(paramIdx);
+    del->BeginInformHostOfParamChangeFromUI(paramIdx);
+    del->SendParameterValueFromUI(paramIdx, p->ToNormalized(clampedValue));
+    del->EndInformHostOfParamChangeFromUI(paramIdx);
+  }
+  void SetParamBoolFromUI(int paramIdx, bool value)
+  {
+    SetParamFromUI(paramIdx, value ? 1.0 : 0.0);
+  }
+
+  // Right-click on a knot: turn its `enabled` bool off. The knot's other
+  // params stay where they are, so re-enabling later restores its state.
+  void DisableKnot(int knotIdx)
+  {
+    const int base = kKnot1_enabled + knotIdx * 10;
+    SetParamBoolFromUI(base + 0, false);
+  }
+
+  // Right-click on empty area: find the first available disabled slot and
+  // turn it on at the cursor's (x, y) in dB, with default tangent=1,
+  // smoothness=1, linked=true. No-op if all 8 editable slots are already
+  // in use.
+  void EnableKnotAt(float screenX, float screenY)
+  {
+    auto* del = GetDelegate();
+    int slot = -1;
+    for (int i = 0; i < kNumKnots; ++i) {
+      const int base = kKnot1_enabled + i * 10;
+      if (!del->GetParam(base + 0)->Bool()) { slot = i; break; }
+    }
+    if (slot < 0) return;  // all slots occupied
+
+    const int base = kKnot1_enabled + slot * 10;
+    const IParam* xP = del->GetParam(base + 2);
+    const IParam* yP = del->GetParam(base + 3);
+    const double xDb = std::clamp(ScreenXToDb(screenX), xP->GetMin(), xP->GetMax());
+    const double yDb = std::clamp(ScreenYToDb(screenY), yP->GetMin(), yP->GetMax());
+
+    // Initialize both channels so state stays consistent if the user later
+    // unlinks the knot. DSP only reads ch0 while linked=true (the default).
+    for (int c = 0; c < 2; ++c) {
+      const int chBase = base + 2 + c * 4;
+      SetParamFromUI(chBase + 0, xDb);   // X
+      SetParamFromUI(chBase + 1, yDb);   // Y
+      SetParamFromUI(chBase + 2, 1.0);   // Tangent
+      SetParamFromUI(chBase + 3, 1.0);   // Smoothness
+    }
+    SetParamBoolFromUI(base + 1, true);  // linked
+    SetParamBoolFromUI(base + 0, true);  // enabled (last)
+
+    // Select the freshly-added knot so the side panel binds to it.
+    static_cast<Curvessor*>(del)->SetSelectedKnot(slot, 0);
   }
 
   KnotHit FindKnotAt(float x, float y)
