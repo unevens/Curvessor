@@ -163,7 +163,10 @@ public:
   // Selected-knot state for the side panel. Updated by the spline editor on
   // click / drag and read by Draw to highlight + by SetSelectedKnot to rebind
   // the panel knobs.
-  int mSelectedKnot = 3;     // i=3..6 are enabled by default; pick the first.
+  // Default = i=6 (the rightmost of the default-active knots 3..6) so the
+  // panel binds to the right-side knee point on first show, which is the
+  // more useful starting point for compressor curve editing.
+  int mSelectedKnot = 6;
   int mSelectedChannel = 0;
 
   // Rebind the side-panel knot knobs to the selected knot's params. Called

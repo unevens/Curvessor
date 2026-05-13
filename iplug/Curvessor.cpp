@@ -1578,15 +1578,26 @@ void Curvessor::SetSelectedKnot(int knotIdx, int channel)
   const int base   = kKnot1_enabled + knotIdx * 10;
   const int chBase = base + 2 + channel * 4;
 
-  // Rebind the side-panel controls to the freshly-selected knot's params.
-  // SetParamIdx swaps the index in mVals and calls SetDirty(false); iPlug2
-  // pulls the new value into the control's internal state on the next
-  // SetValueFromDelegate cycle, so the knob shows the correct reading.
-  if (mKnotPanelKnobX)          mKnotPanelKnobX         ->SetParamIdx(chBase + 0);
-  if (mKnotPanelKnobY)          mKnotPanelKnobY         ->SetParamIdx(chBase + 1);
-  if (mKnotPanelKnobTan)        mKnotPanelKnobTan       ->SetParamIdx(chBase + 2);
-  if (mKnotPanelKnobSmoothness) mKnotPanelKnobSmoothness->SetParamIdx(chBase + 3);
-  if (mKnotPanelLink)           mKnotPanelLink          ->SetParamIdx(base + 1);
+  // Rebind the side-panel controls to the newly-selected knot's params.
+  // SetParamIdx updates mVals[].idx but leaves mVals[].value at the
+  // PREVIOUSLY-bound param's value — so without an explicit pull the knob
+  // would briefly display the wrong value until the next host-driven
+  // SetValueFromDelegate cycle. Push the new param's normalized value
+  // into the control so the visual switch is instant.
+  auto rebind = [this](iplug::igraphics::IControl* ctrl, int paramIdx) {
+    if (!ctrl) return;
+    ctrl->SetParamIdx(paramIdx);
+    if (const IParam* p = GetParam(paramIdx)) {
+      ctrl->SetValue(p->GetNormalized());
+    }
+    ctrl->SetDirty(false);
+  };
+
+  rebind(mKnotPanelKnobX,          chBase + 0);
+  rebind(mKnotPanelKnobY,          chBase + 1);
+  rebind(mKnotPanelKnobTan,        chBase + 2);
+  rebind(mKnotPanelKnobSmoothness, chBase + 3);
+  rebind(mKnotPanelLink,           base + 1);
 
   if (auto* ui = GetUI()) {
     ui->SetAllControlsDirty();
