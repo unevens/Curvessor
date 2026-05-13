@@ -358,6 +358,14 @@ public:
       // Tell the plugin to rebind the side-panel knobs to this knot/channel.
       static_cast<Curvessor*>(del)->SetSelectedKnot(hit.knot, hit.channel);
     }
+    else if (mZoom > 1.001) {
+      // Empty area + zoomed in → start a viewport pan.
+      mPanning = true;
+      mPanStartMouseX = x;
+      mPanStartMouseY = y;
+      mPanStartCenterX = mZoomCenterX;
+      mPanStartCenterY = mZoomCenterY;
+    }
     SetDirty(false);
   }
 
@@ -390,6 +398,22 @@ public:
 
   void OnMouseDrag(float x, float y, float, float, const IMouseMod&) override
   {
+    if (mPanning) {
+      // 1 screen pixel = (visible range / widget width) dB. Drag right →
+      // viewport scrolls left (centre moves left) so the content slides
+      // right with the cursor.
+      const double hv = VisibleHalfRange();
+      const double dbPerPx = 2.0 * hv / static_cast<double>(mRECT.W());
+      mZoomCenterX = mPanStartCenterX
+                   - (x - mPanStartMouseX) * dbPerPx;
+      // Y is screen-inverted: drag down → viewport centre moves up in dB.
+      mZoomCenterY = mPanStartCenterY
+                   + (y - mPanStartMouseY) * dbPerPx;
+      ClampViewToDataRange();
+      SetDirty(false);
+      return;
+    }
+
     if (mDraggedKnot < 0) return;
     const int base = kKnot1_enabled + mDraggedKnot * 10;
     const int chBase = base + 2 + mDraggedChannel * 4;
@@ -432,6 +456,11 @@ public:
 
   void OnMouseUp(float, float, const IMouseMod&) override
   {
+    if (mPanning) {
+      mPanning = false;
+      SetDirty(false);
+      return;
+    }
     if (mDraggedKnot >= 0) {
       const int base = kKnot1_enabled + mDraggedKnot * 10;
       const int chBase = base + 2 + mDraggedChannel * 4;
@@ -515,6 +544,15 @@ private:
   double mZoomCenterY = (kKnotMin + kKnotMax) * 0.5;
   static constexpr double kMinZoom = 1.0;
   static constexpr double kMaxZoom = 16.0;
+
+  // Pan state — set in OnMouseDown when the user clicks on empty LCD area
+  // while zoomed in. OnMouseDrag then slides mZoomCenter* so the dB point
+  // under the cursor moves 1:1 with the cursor.
+  bool   mPanning = false;
+  float  mPanStartMouseX = 0.f;
+  float  mPanStartMouseY = 0.f;
+  double mPanStartCenterX = 0.0;
+  double mPanStartCenterY = 0.0;
 
   // dB ↔ screen mappings, both apply the zoom-and-pan viewport. At zoom = 1
   // and the default centre, this is identical to the un-zoomed mapping.
@@ -1040,21 +1078,41 @@ Curvessor::Curvessor(const InstanceInfo& info)
       return cell.GetCentredInside(kKnobDiameter, kKnobAreaH);
     };
 
-    // Linkable pair: small ch0 knob with a slim "L/R" link toggle next to
-    // it. When the toggle is on (default), both channels follow ch0; when
-    // off the user can drive ch1 independently (currently from the host's
-    // automation lane, or via the spline-editor's right/Alt-click on
-    // overlapping knots if applicable — knobs for ch1 will land in a
-    // future side-panel pass).
-    auto attachLinkable = [&](const IRECT& cell, int ch0Idx, const char* label) {
-      const IRECT knobRect = centredKnobRect(cell).GetHShifted(-9);
-      const IRECT lRect    = IRECT(
-        knobRect.R + 3.f,
-        knobRect.MH() - kLinkButtonH * 0.5f,
-        knobRect.R + 3.f + kLinkButtonW,
-        knobRect.MH() + kLinkButtonH * 0.5f);
-      pGraphics->AttachControl(new IVKnobControl(knobRect, ch0Idx, label, kCurvessorStyle));
-      pGraphics->AttachControl(new IVSwitchControl(lRect, ch0Idx + 2, "L/R", kCurvessorStyle));
+    // Linkable pair: two compact knobs (ch0 / L and ch1 / R) side by side,
+    // plus a slim toggle that gates the _is_linked bool. When the toggle
+    // is on (default), GetLinkable reads ch0 for both channels and the R
+    // knob's value is ignored DSP-side. When off, each knob drives its
+    // own channel. Knob labels are "<short> L" and "<short> R" so the
+    // user can see at a glance which channel is which.
+    auto attachLinkable = [&](const IRECT& cell, int ch0Idx, const char* shortName) {
+      constexpr float kPairKnobDiam = 38.f;
+      constexpr float kPairKnobH    = 64.f;
+      constexpr float kPairGap      = 2.f;
+      constexpr float kPairToggleW  = 14.f;
+      constexpr float kPairToggleH  = 24.f;
+      const float totalW = 2.f * kPairKnobDiam + kPairGap + 4.f + kPairToggleW;
+      const IRECT inner = cell.GetCentredInside(totalW, kPairKnobH);
+
+      char labL[16], labR[16];
+      std::snprintf(labL, sizeof(labL), "%s L", shortName);
+      std::snprintf(labR, sizeof(labR), "%s R", shortName);
+
+      const IRECT lKnob (inner.L,
+                         inner.T,
+                         inner.L + kPairKnobDiam,
+                         inner.B);
+      const IRECT rKnob (lKnob.R + kPairGap,
+                         inner.T,
+                         lKnob.R + kPairGap + kPairKnobDiam,
+                         inner.B);
+      const IRECT tBtn (inner.R - kPairToggleW,
+                        inner.MH() - kPairToggleH * 0.5f,
+                        inner.R,
+                        inner.MH() + kPairToggleH * 0.5f);
+
+      pGraphics->AttachControl(new IVKnobControl(lKnob, ch0Idx + 0, labL, kCurvessorStyle));
+      pGraphics->AttachControl(new IVKnobControl(rKnob, ch0Idx + 1, labR, kCurvessorStyle));
+      pGraphics->AttachControl(new IVSwitchControl(tBtn, ch0Idx + 2, "L=R", kCurvessorStyle));
     };
 
     // Non-linkable knob with the same compact sizing.
@@ -1075,7 +1133,7 @@ Curvessor::Curvessor(const InstanceInfo& info)
     pGraphics->AttachControl(new IVTabSwitchControl(switchRect(cellAt(2, 0), 96, 28), kOversampling,
                               {"1x", "2x", "4x", "8x", "16x", "32x"}, "Oversampling", kCurvessorStyle));
     pGraphics->AttachControl(new IVSwitchControl   (switchRect(cellAt(3, 0), 70, 32), kLinearPhaseOversampling, "Lin Phase", kCurvessorStyle));
-    attachLinkable(cellAt(4, 0), kHighPassCutoff_ch0, "HP Cutoff");
+    attachLinkable(cellAt(4, 0), kHighPassCutoff_ch0, "HP");
     pGraphics->AttachControl(new IVTabSwitchControl(switchRect(cellAt(5, 0), 86, 28), kHighPassOrder,
                               {"Off", "6", "12", "18"}, "HP Order", kCurvessorStyle));
     attachKnob(cellAt(6, 0), kStereoLink,    "Stereo Link");
@@ -1083,15 +1141,17 @@ Curvessor::Curvessor(const InstanceInfo& info)
     // cellAt(8, 0) intentionally empty for now.
 
     // Row 1 — signal-flow params (input → output, plus envelope shape).
-    attachLinkable(cellAt(0, 1), kInputGain_ch0,      "In Gain");
-    attachLinkable(cellAt(1, 1), kOutputGain_ch0,     "Out Gain");
+    // Labels are short to fit the small dual-knob layout; the long form
+    // is in each knob's automation-/tooltip-name via InitDouble's `name`.
+    attachLinkable(cellAt(0, 1), kInputGain_ch0,      "In");
+    attachLinkable(cellAt(1, 1), kOutputGain_ch0,     "Out");
     attachLinkable(cellAt(2, 1), kWet_ch0,            "Wet");
-    attachLinkable(cellAt(3, 1), kFeedbackAmount_ch0, "Feedback");
-    attachLinkable(cellAt(4, 1), kAttack_ch0,         "Attack");
-    attachLinkable(cellAt(5, 1), kRelease_ch0,        "Release");
-    attachLinkable(cellAt(6, 1), kAttackDelay_ch0,    "A Delay");
-    attachLinkable(cellAt(7, 1), kReleaseDelay_ch0,   "R Delay");
-    attachLinkable(cellAt(8, 1), kRMSTime_ch0,        "RMS Time");
+    attachLinkable(cellAt(3, 1), kFeedbackAmount_ch0, "Fb");
+    attachLinkable(cellAt(4, 1), kAttack_ch0,         "Atk");
+    attachLinkable(cellAt(5, 1), kRelease_ch0,        "Rel");
+    attachLinkable(cellAt(6, 1), kAttackDelay_ch0,    "AD");
+    attachLinkable(cellAt(7, 1), kReleaseDelay_ch0,   "RD");
+    attachLinkable(cellAt(8, 1), kRMSTime_ch0,        "RMS");
 
     // VU meters fed by ISender packets pushed from ProcessBlock.
     const IVStyle meterStyle = kCurvessorStyle.WithDrawFrame(false);
@@ -1104,13 +1164,16 @@ Curvessor::Curvessor(const InstanceInfo& info)
     // Gain meter shows gain correction in dB — symmetric around 0 so both
     // compression (gc < 0) and expansion (gc > 0) read clearly. ±36 dB
     // covers anything Curvessor's curve realistically applies; tick marks
-    // every 6 dB inside that range.
-    pGraphics->AttachControl(
+    // every 6 dB inside that range. SetBaseValue(0.5) anchors the fill at
+    // the centre of the bar, so compression extends to the left and
+    // expansion to the right rather than both filling from the same edge.
+    auto* gainMeter = static_cast<IVMeterControl<2>*>(pGraphics->AttachControl(
       new IVMeterControl<2>(gainMeterRect, "Gain", meterStyle,
                             EDirection::Horizontal, {"L", "R"}, 0,
                             IVMeterControl<2>::EResponse::Log, -36.f, 36.f,
                             {-24, -12, -6, 0, 6, 12, 24}),
-      kCtrlTagGainMeter);
+      kCtrlTagGainMeter));
+    gainMeter->SetBaseValue(0.5);
   };
 #endif
 }
