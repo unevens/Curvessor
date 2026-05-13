@@ -197,19 +197,49 @@ public:
       }
     }
 
+    // Tangent handle on the selected knot. Only one knot's tangent handle
+    // is shown at a time to keep the editor uncluttered; the user picks a
+    // knot with a click, then drags its tangent. When the knot is linked,
+    // the handle controls ch0's tangent (ch1's is ignored by the DSP path
+    // when linked).
+    if (selKnot >= 0) {
+      const int selBase = kKnot1_enabled + selKnot * 10;
+      if (del->GetParam(selBase + 0)->Bool()) {
+        const bool linked = del->GetParam(selBase + 1)->Bool();
+        DrawTangentHandle(g, selKnot, linked ? 0 : selCh);
+      }
+    }
+
     // Frame around the editor.
     g.DrawRect(IColor(255, 80, 80, 96), mRECT, nullptr, 1.f);
   }
 
   void OnMouseDown(float x, float y, const IMouseMod&) override
   {
+    auto* del = GetDelegate();
+
+    // Tangent handle on the currently-selected knot takes priority — it
+    // overlaps the knot area visually but the hit is the smaller dot.
+    const KnotHit thit = FindTangentAt(x, y);
+    if (thit.knot >= 0) {
+      mDraggedKnot = thit.knot;
+      mDraggedChannel = thit.channel;
+      mDraggingTangent = true;
+      const int base = kKnot1_enabled + thit.knot * 10;
+      const int chBase = base + 2 + thit.channel * 4;
+      del->BeginInformHostOfParamChangeFromUI(chBase + 2);  // Tan_chC
+      SetDirty(false);
+      return;
+    }
+
+    // Otherwise, try a knot body hit.
     const KnotHit hit = FindKnotAt(x, y);
     mDraggedKnot = hit.knot;
     mDraggedChannel = hit.channel;
+    mDraggingTangent = false;
     if (hit.knot >= 0) {
       const int base = kKnot1_enabled + hit.knot * 10;
       const int chBase = base + 2 + hit.channel * 4;
-      auto* del = GetDelegate();
       del->BeginInformHostOfParamChangeFromUI(chBase + 0);  // X_chC
       del->BeginInformHostOfParamChangeFromUI(chBase + 1);  // Y_chC
       // Tell the plugin to rebind the side-panel knobs to this knot/channel.
@@ -223,18 +253,39 @@ public:
     if (mDraggedKnot < 0) return;
     const int base = kKnot1_enabled + mDraggedKnot * 10;
     const int chBase = base + 2 + mDraggedChannel * 4;
-    const int xIdx = chBase + 0;
-    const int yIdx = chBase + 1;
-
     auto* del = GetDelegate();
-    const IParam* xParam = del->GetParam(xIdx);
-    const IParam* yParam = del->GetParam(yIdx);
 
-    const double xDb = std::clamp(ScreenXToDb(x), xParam->GetMin(), xParam->GetMax());
-    const double yDb = std::clamp(ScreenYToDb(y), yParam->GetMin(), yParam->GetMax());
+    if (mDraggingTangent) {
+      // Tangent t = dy_dB / dx_dB, with the cursor offset measured from the
+      // knot in screen space (y inverted). When the cursor is dragged near
+      // the vertical through the knot, slope diverges → clamp.
+      const float kx = DbToScreenX(del->GetParam(chBase + 0)->Value());
+      const float ky = DbToScreenY(del->GetParam(chBase + 1)->Value());
+      const float dxScreen = x - kx;
+      const float dyScreen = ky - y;  // up on screen = positive dB
 
-    del->SendParameterValueFromUI(xIdx, xParam->ToNormalized(xDb));
-    del->SendParameterValueFromUI(yIdx, yParam->ToNormalized(yDb));
+      const int tanIdx = chBase + 2;
+      const IParam* tanParam = del->GetParam(tanIdx);
+      double tNew;
+      if (std::abs(dxScreen) < 1.f) {
+        tNew = (dyScreen >= 0.f) ? tanParam->GetMax() : tanParam->GetMin();
+      } else {
+        tNew = static_cast<double>(dyScreen) / dxScreen;
+        // If the user drags past the vertical, sign flips weirdly — clamp.
+        tNew = std::clamp(tNew, tanParam->GetMin(), tanParam->GetMax());
+      }
+      del->SendParameterValueFromUI(tanIdx, tanParam->ToNormalized(tNew));
+    }
+    else {
+      const int xIdx = chBase + 0;
+      const int yIdx = chBase + 1;
+      const IParam* xParam = del->GetParam(xIdx);
+      const IParam* yParam = del->GetParam(yIdx);
+      const double xDb = std::clamp(ScreenXToDb(x), xParam->GetMin(), xParam->GetMax());
+      const double yDb = std::clamp(ScreenYToDb(y), yParam->GetMin(), yParam->GetMax());
+      del->SendParameterValueFromUI(xIdx, xParam->ToNormalized(xDb));
+      del->SendParameterValueFromUI(yIdx, yParam->ToNormalized(yDb));
+    }
 
     SetDirty(false);
   }
@@ -245,11 +296,16 @@ public:
       const int base = kKnot1_enabled + mDraggedKnot * 10;
       const int chBase = base + 2 + mDraggedChannel * 4;
       auto* del = GetDelegate();
-      del->EndInformHostOfParamChangeFromUI(chBase + 0);
-      del->EndInformHostOfParamChangeFromUI(chBase + 1);
+      if (mDraggingTangent) {
+        del->EndInformHostOfParamChangeFromUI(chBase + 2);
+      } else {
+        del->EndInformHostOfParamChangeFromUI(chBase + 0);
+        del->EndInformHostOfParamChangeFromUI(chBase + 1);
+      }
     }
     mDraggedKnot = -1;
     mDraggedChannel = 0;
+    mDraggingTangent = false;
     SetDirty(false);
   }
 
@@ -278,12 +334,16 @@ private:
   static constexpr double kKnotMax = 6.0;
   static constexpr float kKnotRadius = 6.f;
   static constexpr float kKnotHitRadiusSq = 20.f * 20.f;
+  static constexpr float kTangentHandleOffset = 32.f;   // pixels from knot center
+  static constexpr float kTangentHandleRadius = 4.f;
+  static constexpr float kTangentHitRadiusSq = 14.f * 14.f;
 
   struct KnotHit { int knot; int channel; };
 
   juicy::GuiSpline mSpline{ curvessor::maxNumKnots };
   int mDraggedKnot = -1;
   int mDraggedChannel = 0;
+  bool mDraggingTangent = false;
   int mHoverKnot = -1;
   int mHoverChannel = 0;
 
@@ -347,6 +407,75 @@ private:
       }
     }
     return best;
+  }
+
+  // Tangent handle hit-test, on the currently-selected knot/channel only.
+  // We don't show handles on every visible knot — too much visual clutter
+  // for the small editor — so the user picks a knot first, then drags its
+  // tangent.
+  KnotHit FindTangentAt(float x, float y)
+  {
+    auto* plug = static_cast<Curvessor*>(GetDelegate());
+    const int knotIdx = plug->mSelectedKnot;
+    const int channel = plug->mSelectedChannel;
+    if (knotIdx < 0) return {-1, 0};
+
+    auto* del = GetDelegate();
+    const int base = kKnot1_enabled + knotIdx * 10;
+    if (!del->GetParam(base + 0)->Bool()) return {-1, 0};
+    // When linked, the side panel's "ch1" selection is meaningless; pin to ch0.
+    const bool linked = del->GetParam(base + 1)->Bool();
+    const int effectiveCh = linked ? 0 : channel;
+
+    float hx, hy;
+    TangentHandleScreenPos(knotIdx, effectiveCh, hx, hy);
+    const float dx = hx - x;
+    const float dy = hy - y;
+    if (dx * dx + dy * dy < kTangentHitRadiusSq) {
+      return {knotIdx, effectiveCh};
+    }
+    return {-1, 0};
+  }
+
+  // Compute the (x, y) screen position of the tangent handle for the given
+  // knot/channel. Uses atan(t) to keep the handle on a fixed-radius circle,
+  // so steep tangents don't push the handle off-screen.
+  void TangentHandleScreenPos(int knotIdx, int channel, float& outX, float& outY)
+  {
+    auto* del = GetDelegate();
+    const int base = kKnot1_enabled + knotIdx * 10;
+    const int chBase = base + 2 + channel * 4;
+    const float kx = DbToScreenX(del->GetParam(chBase + 0)->Value());
+    const float ky = DbToScreenY(del->GetParam(chBase + 1)->Value());
+    const double t = del->GetParam(chBase + 2)->Value();
+    const double alpha = std::atan(t);
+    outX = kx + kTangentHandleOffset * static_cast<float>(std::cos(alpha));
+    outY = ky - kTangentHandleOffset * static_cast<float>(std::sin(alpha));
+  }
+
+  void DrawTangentHandle(IGraphics& g, int knotIdx, int channel)
+  {
+    auto* del = GetDelegate();
+    const int base = kKnot1_enabled + knotIdx * 10;
+    if (!del->GetParam(base + 0)->Bool()) return;
+    const int chBase = base + 2 + channel * 4;
+    const float kx = DbToScreenX(del->GetParam(chBase + 0)->Value());
+    const float ky = DbToScreenY(del->GetParam(chBase + 1)->Value());
+
+    float hx, hy;
+    TangentHandleScreenPos(knotIdx, channel, hx, hy);
+
+    const IColor lineCol(200, 220, 220, 230);
+    g.DrawLine(lineCol, kx, ky, hx, hy, nullptr, 1.f);
+
+    const bool isDragging = (knotIdx == mDraggedKnot
+                          && channel == mDraggedChannel
+                          && mDraggingTangent);
+    const IColor handleCol = isDragging
+      ? IColor(255, 255, 255, 255)
+      : IColor(255, 200, 220, 255);
+    g.FillCircle(handleCol, hx, hy, kTangentHandleRadius);
+    g.DrawCircle(IColor(255, 10, 12, 16), hx, hy, kTangentHandleRadius, nullptr, 1.f);
   }
 
   // Populates mSpline from the live param values. Returns count of active
