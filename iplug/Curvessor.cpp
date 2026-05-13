@@ -1095,15 +1095,21 @@ Curvessor::Curvessor(const InstanceInfo& info)
 
     // VU meters fed by ISender packets pushed from ProcessBlock.
     const IVStyle meterStyle = kCurvessorStyle.WithDrawFrame(false);
+    // Level meter is one-sided (audio level): -60..+6 dB.
     pGraphics->AttachControl(
       new IVMeterControl<2>(levelMeterRect, "Level", meterStyle,
                             EDirection::Horizontal, {"L", "R"}, 0,
                             IVMeterControl<2>::EResponse::Log, -60.f, 6.f),
       kCtrlTagLevelMeter);
+    // Gain meter shows gain correction in dB — symmetric around 0 so both
+    // compression (gc < 0) and expansion (gc > 0) read clearly. ±36 dB
+    // covers anything Curvessor's curve realistically applies; tick marks
+    // every 6 dB inside that range.
     pGraphics->AttachControl(
       new IVMeterControl<2>(gainMeterRect, "Gain", meterStyle,
                             EDirection::Horizontal, {"L", "R"}, 0,
-                            IVMeterControl<2>::EResponse::Log, -60.f, 6.f),
+                            IVMeterControl<2>::EResponse::Log, -36.f, 36.f,
+                            {-24, -12, -6, 0, 6, 12, 24}),
       kCtrlTagGainMeter);
   };
 #endif
