@@ -210,6 +210,26 @@ public:
       }
     }
 
+    // Live envelope-follower "current input" dot per channel. The amp value
+    // arrives via mLevelMeterSender → OnMsgFromDelegate; convert back to dB
+    // here so we can place it on the curve's X axis. The dot's Y is the
+    // spline's response at that X — i.e. exactly where the compressor is
+    // currently acting.
+    for (int c = 0; c < 2; ++c) {
+      const float amp = mCurrentLevelAmp[c];
+      if (amp <= 0.f) continue;  // pre-roll: env is silence, skip
+      const double dB = 20.0 * std::log10(static_cast<double>(amp));
+      if (dB < kKnotMin || dB > kKnotMax) continue;
+      const double yDb = mSpline.process(dB, c, numActive);
+      const float dx = DbToScreenX(dB);
+      const float dy = DbToScreenY(yDb);
+      const IColor dotCol = (c == 0)
+        ? IColor(255, 200, 230, 255)
+        : IColor(255, 255, 200, 200);
+      g.FillCircle(dotCol, dx, dy, 4.f);
+      g.DrawCircle(IColor(255, 10, 12, 16), dx, dy, 4.f, nullptr, 1.f);
+    }
+
     // Frame around the editor.
     g.DrawRect(IColor(255, 80, 80, 96), mRECT, nullptr, 1.f);
   }
@@ -328,6 +348,23 @@ public:
     }
   }
 
+  // Receives ISenderData<2, float> packets from Curvessor::OnIdle. The
+  // payload carries the envelope-follower output per channel as a linear
+  // amplitude (the meter widget needs amp for its Log response); we stash
+  // it and read it back in Draw to position the live level dot on the
+  // curve.
+  void OnMsgFromDelegate(int msgTag, int dataSize, const void* pData) override
+  {
+    if (msgTag != ISender<>::kUpdateMessage) return;
+    IByteStream stream(pData, dataSize);
+    int pos = 0;
+    ISenderData<2, float> d;
+    pos = stream.Get(&d, pos);
+    mCurrentLevelAmp[0] = d.vals[0];
+    mCurrentLevelAmp[1] = d.vals[1];
+    // No SetDirty here — OnIdle already repaints us every frame.
+  }
+
 private:
   static constexpr int kNumKnots = 8;
   static constexpr double kKnotMin = -96.0;
@@ -346,6 +383,9 @@ private:
   bool mDraggingTangent = false;
   int mHoverKnot = -1;
   int mHoverChannel = 0;
+  // Live envelope-follower output per channel (linear amplitude). Drawn as
+  // a dot riding along the curve to show where compression is acting now.
+  std::array<float, 2> mCurrentLevelAmp{};
 
   float DbToScreenX(double db) const
   {
@@ -1136,7 +1176,12 @@ void Curvessor::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 // (it just no-ops via SendControlMsgFromDelegate when there's no UI).
 void Curvessor::OnIdle()
 {
-  mLevelMeterSender.TransmitData(*this);
+  // Level meter packets go to both the meter widget and the spline editor —
+  // the editor uses them to plot a moving "current input" dot on the curve.
+  // TransmitDataToControlsWithTags overrides d.ctrlTag per recipient so the
+  // same queue payload reaches both controls.
+  mLevelMeterSender.TransmitDataToControlsWithTags(
+    *this, {kCtrlTagLevelMeter, kCtrlTagSplineEditor});
   mGainMeterSender.TransmitData(*this);
 
 #if IPLUG_EDITOR
