@@ -694,18 +694,23 @@ Curvessor::Curvessor(const InstanceInfo& info)
     const IRECT splineEditorRect = splinePanelArea.GetFromLeft(700);
     const IRECT knotPanelRect    = splinePanelArea.GetFromRight(200);
 
-    // Knot panel: 3 stacked knobs (X / Y / Tan) + a Link toggle row.
-    auto knotPanelRow = [&](int rowIdx, int nRows) {
-      const float rowH = knotPanelRect.H() / nRows;
-      return IRECT(knotPanelRect.L,
-                   knotPanelRect.T + rowIdx * rowH,
-                   knotPanelRect.R,
-                   knotPanelRect.T + (rowIdx + 1) * rowH).GetPadded(-4);
+    // Knot panel: 2×2 grid of knobs (X / Y top row, Tangent / Smoothness
+    // bottom row) plus a Link L/R toggle along the bottom edge.
+    const IRECT knotPanelKnobsArea = knotPanelRect.GetReducedFromBottom(56);
+    const IRECT knotPanelLinkArea  = knotPanelRect.GetFromBottom(56);
+    auto knobCell = [&](int col, int row) {
+      const float w = knotPanelKnobsArea.W() / 2.f;
+      const float h = knotPanelKnobsArea.H() / 2.f;
+      return IRECT(knotPanelKnobsArea.L + col * w,
+                   knotPanelKnobsArea.T + row * h,
+                   knotPanelKnobsArea.L + (col + 1) * w,
+                   knotPanelKnobsArea.T + (row + 1) * h).GetPadded(-4);
     };
-    const IRECT knobXRect    = knotPanelRow(0, 4);
-    const IRECT knobYRect    = knotPanelRow(1, 4);
-    const IRECT knobTanRect  = knotPanelRow(2, 4);
-    const IRECT linkRect     = knotPanelRow(3, 4).GetCentredInside(120, 32);
+    const IRECT knobXRect      = knobCell(0, 0);
+    const IRECT knobYRect      = knobCell(1, 0);
+    const IRECT knobTanRect    = knobCell(0, 1);
+    const IRECT knobSmoothRect = knobCell(1, 1);
+    const IRECT linkRect       = knotPanelLinkArea.GetCentredInside(140, 32);
 
     const IRECT metersArea = innerBounds.GetFromBottom(90).GetPadded(-5);
     const IRECT levelMeterRect = metersArea.GetFromLeft(metersArea.W() * 0.5f).GetPadded(-4);
@@ -718,10 +723,11 @@ Curvessor::Curvessor(const InstanceInfo& info)
       pGraphics->GetControlWithTag(kCtrlTagSplineEditor)->SetTargetAndDrawRECTs(splineEditorRect);
       pGraphics->GetControlWithTag(kCtrlTagLevelMeter)->SetTargetAndDrawRECTs(levelMeterRect);
       pGraphics->GetControlWithTag(kCtrlTagGainMeter)->SetTargetAndDrawRECTs(gainMeterRect);
-      if (mKnotPanelKnobX)   mKnotPanelKnobX  ->SetTargetAndDrawRECTs(knobXRect);
-      if (mKnotPanelKnobY)   mKnotPanelKnobY  ->SetTargetAndDrawRECTs(knobYRect);
-      if (mKnotPanelKnobTan) mKnotPanelKnobTan->SetTargetAndDrawRECTs(knobTanRect);
-      if (mKnotPanelLink)    mKnotPanelLink   ->SetTargetAndDrawRECTs(linkRect);
+      if (mKnotPanelKnobX)          mKnotPanelKnobX         ->SetTargetAndDrawRECTs(knobXRect);
+      if (mKnotPanelKnobY)          mKnotPanelKnobY         ->SetTargetAndDrawRECTs(knobYRect);
+      if (mKnotPanelKnobTan)        mKnotPanelKnobTan       ->SetTargetAndDrawRECTs(knobTanRect);
+      if (mKnotPanelKnobSmoothness) mKnotPanelKnobSmoothness->SetTargetAndDrawRECTs(knobSmoothRect);
+      if (mKnotPanelLink)           mKnotPanelLink          ->SetTargetAndDrawRECTs(linkRect);
       return;
     }
 
@@ -750,10 +756,11 @@ Curvessor::Curvessor(const InstanceInfo& info)
     {
       const int base = kKnot1_enabled + mSelectedKnot * 10;
       const int chBase = base + 2 + mSelectedChannel * 4;
-      mKnotPanelKnobX   = pGraphics->AttachControl(new IVKnobControl(knobXRect,   chBase + 0, "X (dB)"));
-      mKnotPanelKnobY   = pGraphics->AttachControl(new IVKnobControl(knobYRect,   chBase + 1, "Y (dB)"));
-      mKnotPanelKnobTan = pGraphics->AttachControl(new IVKnobControl(knobTanRect, chBase + 2, "Tangent"));
-      mKnotPanelLink    = pGraphics->AttachControl(new IVSwitchControl(linkRect, base + 1, "Link L/R"));
+      mKnotPanelKnobX          = pGraphics->AttachControl(new IVKnobControl(knobXRect,      chBase + 0, "X (dB)"));
+      mKnotPanelKnobY          = pGraphics->AttachControl(new IVKnobControl(knobYRect,      chBase + 1, "Y (dB)"));
+      mKnotPanelKnobTan        = pGraphics->AttachControl(new IVKnobControl(knobTanRect,    chBase + 2, "Tangent"));
+      mKnotPanelKnobSmoothness = pGraphics->AttachControl(new IVKnobControl(knobSmoothRect, chBase + 3, "Smooth"));
+      mKnotPanelLink           = pGraphics->AttachControl(new IVSwitchControl(linkRect, base + 1, "Link L/R"));
     }
 
     // Param grid sits between the spline editor and meters. 6 cols × 3 rows.
@@ -1224,10 +1231,11 @@ void Curvessor::SetSelectedKnot(int knotIdx, int channel)
   // SetParamIdx swaps the index in mVals and calls SetDirty(false); iPlug2
   // pulls the new value into the control's internal state on the next
   // SetValueFromDelegate cycle, so the knob shows the correct reading.
-  if (mKnotPanelKnobX)   mKnotPanelKnobX  ->SetParamIdx(chBase + 0);
-  if (mKnotPanelKnobY)   mKnotPanelKnobY  ->SetParamIdx(chBase + 1);
-  if (mKnotPanelKnobTan) mKnotPanelKnobTan->SetParamIdx(chBase + 2);
-  if (mKnotPanelLink)    mKnotPanelLink   ->SetParamIdx(base + 1);
+  if (mKnotPanelKnobX)          mKnotPanelKnobX         ->SetParamIdx(chBase + 0);
+  if (mKnotPanelKnobY)          mKnotPanelKnobY         ->SetParamIdx(chBase + 1);
+  if (mKnotPanelKnobTan)        mKnotPanelKnobTan       ->SetParamIdx(chBase + 2);
+  if (mKnotPanelKnobSmoothness) mKnotPanelKnobSmoothness->SetParamIdx(chBase + 3);
+  if (mKnotPanelLink)           mKnotPanelLink          ->SetParamIdx(base + 1);
 
   if (auto* ui = GetUI()) {
     ui->SetAllControlsDirty();

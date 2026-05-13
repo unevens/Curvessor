@@ -176,5 +176,6 @@ private:
   iplug::igraphics::IControl* mKnotPanelKnobX = nullptr;
   iplug::igraphics::IControl* mKnotPanelKnobY = nullptr;
   iplug::igraphics::IControl* mKnotPanelKnobTan = nullptr;
+  iplug::igraphics::IControl* mKnotPanelKnobSmoothness = nullptr;
   iplug::igraphics::IControl* mKnotPanelLink = nullptr;
 };
