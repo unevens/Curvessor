@@ -177,23 +177,37 @@ public:
     const IColor knotHotCol(255, 255, 255, 255);
     const IColor knotRingCol(255,  10,  12,  16);
 
+    // Faded "ghost" colours for disabled knots, so the user can still see
+    // their stored positions and double-click to re-enable them.
+    const IColor ghostColCh0(120,  80, 160, 240);
+    const IColor ghostColCh1(120, 240, 100, 100);
+
     for (int i = 0; i < kNumKnots; ++i) {
       const int base = kKnot1_enabled + i * 10;
-      if (!del->GetParam(base + 0)->Bool()) continue;
-      const bool linked = del->GetParam(base + 1)->Bool();
+      const bool enabled = del->GetParam(base + 0)->Bool();
+      const bool linked  = del->GetParam(base + 1)->Bool();
       for (int c = 0; c < 2; ++c) {
         if (linked && c > 0) break;  // when linked, only one knot per i
         const int chBase = base + 2 + c * 4;
         const float kx = DbToScreenX(del->GetParam(chBase + 0)->Value());
         const float ky = DbToScreenY(del->GetParam(chBase + 1)->Value());
 
-        const bool hot = (i == mDraggedKnot && c == mDraggedChannel)
-                      || (i == mHoverKnot   && c == mHoverChannel);
-        const bool sel = (i == selKnot && c == selCh);
-        const IColor& fill = hot ? knotHotCol : (c == 0 ? knotColCh0 : knotColCh1);
-        const float r = sel ? kKnotRadius + 2.f : kKnotRadius;
-        g.FillCircle(fill, kx, ky, r);
-        g.DrawCircle(knotRingCol, kx, ky, r, nullptr, sel ? 2.f : 1.f);
+        const bool hot = enabled
+                      && ((i == mDraggedKnot && c == mDraggedChannel)
+                       || (i == mHoverKnot   && c == mHoverChannel));
+        const bool sel = enabled && (i == selKnot && c == selCh);
+
+        if (enabled) {
+          const IColor& fill = hot ? knotHotCol : (c == 0 ? knotColCh0 : knotColCh1);
+          const float r = sel ? kKnotRadius + 2.f : kKnotRadius;
+          g.FillCircle(fill, kx, ky, r);
+          g.DrawCircle(knotRingCol, kx, ky, r, nullptr, sel ? 2.f : 1.f);
+        } else {
+          // Ghost: smaller, translucent, no inner ring. Still hit-testable
+          // by FindKnotAt(includeDisabled=true) for double-click re-enable.
+          const IColor& fill = (c == 0) ? ghostColCh0 : ghostColCh1;
+          g.FillCircle(fill, kx, ky, kKnotRadius - 1.f);
+        }
       }
     }
 
@@ -248,20 +262,7 @@ public:
   void OnMouseDown(float x, float y, const IMouseMod& mod) override
   {
     auto* del = GetDelegate();
-
-    // Right-click: toggle a knot.
-    //   - on an existing knot → disable it
-    //   - on empty area → enable the first available disabled slot at (x, y)
-    if (mod.R) {
-      const KnotHit hit = FindKnotAt(x, y);
-      if (hit.knot >= 0) {
-        DisableKnot(hit.knot);
-      } else {
-        EnableKnotAt(x, y);
-      }
-      SetDirty(false);
-      return;
-    }
+    const bool preferCh1 = mod.R || mod.A;
 
     // Tangent handle on the currently-selected knot takes priority — it
     // overlaps the knot area visually but the hit is the smaller dot.
@@ -277,8 +278,9 @@ public:
       return;
     }
 
-    // Otherwise, try a knot body hit.
-    const KnotHit hit = FindKnotAt(x, y);
+    // Knot body hit. Right-button / Alt biases the hit toward ch1 when both
+    // channels of an unlinked knot are stacked on screen.
+    const KnotHit hit = FindKnotAt(x, y, preferCh1, /*includeDisabled=*/false);
     mDraggedKnot = hit.knot;
     mDraggedChannel = hit.channel;
     mDraggingTangent = false;
@@ -290,6 +292,33 @@ public:
       // Tell the plugin to rebind the side-panel knobs to this knot/channel.
       static_cast<Curvessor*>(del)->SetSelectedKnot(hit.knot, hit.channel);
     }
+    SetDirty(false);
+  }
+
+  // Double-click toggles a knot's state. Matches the JUCE editor:
+  //   - left / no-mod double-click on a knot → toggle `enabled` (add/remove)
+  //   - right / alt double-click on a knot   → toggle `linked` (split L/R)
+  // Disabled knots are hit-testable (drawn faintly as ghosts) so users can
+  // re-enable them by double-clicking.
+  void OnMouseDblClick(float x, float y, const IMouseMod& mod) override
+  {
+    const bool preferCh1 = mod.R || mod.A;
+    const KnotHit hit = FindKnotAt(x, y, preferCh1, /*includeDisabled=*/true);
+    if (hit.knot < 0) {
+      SetDirty(false);
+      return;
+    }
+    const int base = kKnot1_enabled + hit.knot * 10;
+    auto* del = GetDelegate();
+    if (preferCh1) {
+      const bool linked = del->GetParam(base + 1)->Bool();
+      SetParamBoolFromUI(base + 1, !linked);
+    } else {
+      const bool enabled = del->GetParam(base + 0)->Bool();
+      SetParamBoolFromUI(base + 0, !enabled);
+    }
+    // Make this knot the selection so the side panel binds to it.
+    static_cast<Curvessor*>(del)->SetSelectedKnot(hit.knot, hit.channel);
     SetDirty(false);
   }
 
@@ -462,58 +491,23 @@ private:
     SetParamFromUI(paramIdx, value ? 1.0 : 0.0);
   }
 
-  // Right-click on a knot: turn its `enabled` bool off. The knot's other
-  // params stay where they are, so re-enabling later restores its state.
-  void DisableKnot(int knotIdx)
-  {
-    const int base = kKnot1_enabled + knotIdx * 10;
-    SetParamBoolFromUI(base + 0, false);
-  }
-
-  // Right-click on empty area: find the first available disabled slot and
-  // turn it on at the cursor's (x, y) in dB, with default tangent=1,
-  // smoothness=1, linked=true. No-op if all 8 editable slots are already
-  // in use.
-  void EnableKnotAt(float screenX, float screenY)
+  // Hit-test knots, returning the nearest hit subject to channel-preference
+  // and enabled-state filters. Mirrors juicy/SplineEditor::selectKnot — the
+  // RMB / Alt modifier biases toward ch1 when both channels of an unlinked
+  // knot sit at the same screen position. For double-click we also include
+  // disabled knots so the user can target their (ghost-drawn) positions.
+  KnotHit FindKnotAt(float x, float y,
+                     bool preferCh1 = false,
+                     bool includeDisabled = false)
   {
     auto* del = GetDelegate();
-    int slot = -1;
+    KnotHit nearest[2] = {{-1, 0}, {-1, 1}};   // best ch0 hit, best ch1 hit
+    float nearestDist2[2] = {kKnotHitRadiusSq, kKnotHitRadiusSq};
+
     for (int i = 0; i < kNumKnots; ++i) {
       const int base = kKnot1_enabled + i * 10;
-      if (!del->GetParam(base + 0)->Bool()) { slot = i; break; }
-    }
-    if (slot < 0) return;  // all slots occupied
-
-    const int base = kKnot1_enabled + slot * 10;
-    const IParam* xP = del->GetParam(base + 2);
-    const IParam* yP = del->GetParam(base + 3);
-    const double xDb = std::clamp(ScreenXToDb(screenX), xP->GetMin(), xP->GetMax());
-    const double yDb = std::clamp(ScreenYToDb(screenY), yP->GetMin(), yP->GetMax());
-
-    // Initialize both channels so state stays consistent if the user later
-    // unlinks the knot. DSP only reads ch0 while linked=true (the default).
-    for (int c = 0; c < 2; ++c) {
-      const int chBase = base + 2 + c * 4;
-      SetParamFromUI(chBase + 0, xDb);   // X
-      SetParamFromUI(chBase + 1, yDb);   // Y
-      SetParamFromUI(chBase + 2, 1.0);   // Tangent
-      SetParamFromUI(chBase + 3, 1.0);   // Smoothness
-    }
-    SetParamBoolFromUI(base + 1, true);  // linked
-    SetParamBoolFromUI(base + 0, true);  // enabled (last)
-
-    // Select the freshly-added knot so the side panel binds to it.
-    static_cast<Curvessor*>(del)->SetSelectedKnot(slot, 0);
-  }
-
-  KnotHit FindKnotAt(float x, float y)
-  {
-    auto* del = GetDelegate();
-    KnotHit best{-1, 0};
-    float bestDist2 = kKnotHitRadiusSq;
-    for (int i = 0; i < kNumKnots; ++i) {
-      const int base = kKnot1_enabled + i * 10;
-      if (!del->GetParam(base + 0)->Bool()) continue;
+      const bool enabled = del->GetParam(base + 0)->Bool();
+      if (!includeDisabled && !enabled) continue;
       const bool linked = del->GetParam(base + 1)->Bool();
       for (int c = 0; c < 2; ++c) {
         if (linked && c > 0) break;
@@ -523,13 +517,26 @@ private:
         const float dx = kx - x;
         const float dy = ky - y;
         const float d2 = dx * dx + dy * dy;
-        if (d2 < bestDist2) {
-          bestDist2 = d2;
-          best = {i, c};
+        // Linked knot contributes to the ch0 hit slot; unlinked ch1 to ch1.
+        const int hitCh = linked ? 0 : c;
+        if (d2 < nearestDist2[hitCh]) {
+          nearestDist2[hitCh] = d2;
+          nearest[hitCh] = {i, hitCh};
         }
       }
     }
-    return best;
+
+    // Pick channel preference; fall back to the other if the preferred has
+    // no hit.
+    int pick;
+    if (preferCh1 && nearest[1].knot >= 0) {
+      pick = 1;
+    } else if (nearest[0].knot >= 0 && nearest[1].knot >= 0) {
+      pick = (nearestDist2[0] <= nearestDist2[1]) ? 0 : 1;
+    } else {
+      pick = (nearest[0].knot >= 0) ? 0 : 1;
+    }
+    return nearest[pick];
   }
 
   // Tangent handle hit-test, on the currently-selected knot/channel only.
