@@ -7,6 +7,8 @@
 #include "iplug-helpers/controls/Palette.hpp"
 #include "iplug-helpers/controls/LightMarkerMeterControl.hpp"
 #include "iplug-helpers/layout/KnobCellLayout.hpp"
+#include "iplug-helpers/util/LinkablePairPropagation.hpp"
+#include "iplug-helpers/util/SelectedKnotPanel.hpp"
 using namespace iplug_helpers;
 #endif
 
@@ -1777,21 +1779,13 @@ void Curvessor::OnIdle()
   // them), so the framework's automatic UpdatePeers path doesn't reach
   // these knobs — without this pull, dragging a knot in the editor would
   // leave the panel knobs frozen on whatever they showed at the last
-  // click. SetValueFromDelegate writes the new value into mVals and marks
-  // the control dirty.
-  auto syncControl = [this](iplug::igraphics::IControl* ctrl) {
-    if (!ctrl) return;
-    const int idx = ctrl->GetParamIdx();
-    if (idx < 0) return;
-    if (const IParam* p = GetParam(idx)) {
-      ctrl->SetValueFromDelegate(p->GetNormalized());
-    }
-  };
-  syncControl(mKnotPanelKnobX);
-  syncControl(mKnotPanelKnobY);
-  syncControl(mKnotPanelKnobTan);
-  syncControl(mKnotPanelKnobSmoothness);
-  syncControl(mKnotPanelLink);
+  // click. iplug_helpers::SyncControlFromParam does the
+  // SetValueFromDelegate pull (and is null-safe).
+  iplug_helpers::SyncControlFromParam(*this, mKnotPanelKnobX);
+  iplug_helpers::SyncControlFromParam(*this, mKnotPanelKnobY);
+  iplug_helpers::SyncControlFromParam(*this, mKnotPanelKnobTan);
+  iplug_helpers::SyncControlFromParam(*this, mKnotPanelKnobSmoothness);
+  iplug_helpers::SyncControlFromParam(*this, mKnotPanelLink);
 
   // Matrix row labels: "Left"/"Right" in stereo mode, "Mid"/"Side" in M/S
   // mode. SetStr is a no-op when the new string matches the old, so it's
@@ -1834,51 +1828,14 @@ void Curvessor::OnUIClose()
 void Curvessor::OnParamChangeUI(int paramIdx, EParamSource source)
 {
 #if IPLUG_EDITOR
-  if (mPropagatingLinkChange) return;
-  // Only propagate user-driven UI changes. Skip kHost / kPresetRecall /
-  // kReset / kUnknown so that:
-  //  - auval's "did the value persist after init?" check isn't broken by
-  //    cross-channel cascades during the test setter;
-  //  - preset / state restoration doesn't have one channel overwriting
-  //    the other on the way in.
-  if (source != kUI) return;
-
   static constexpr int kLinkableCh0Bases[] = {
     kInputGain_ch0,      kOutputGain_ch0,     kWet_ch0,
     kFeedbackAmount_ch0, kAttack_ch0,         kRelease_ch0,
     kAttackDelay_ch0,    kReleaseDelay_ch0,   kRMSTime_ch0,
     kHighPassCutoff_ch0,
   };
-
-  for (int ch0 : kLinkableCh0Bases) {
-    if (paramIdx != ch0 && paramIdx != ch0 + 1) continue;
-
-    // Linked? If not, leave the channels independent.
-    if (!GetParam(ch0 + 2)->Bool()) return;
-
-    const int other = (paramIdx == ch0) ? (ch0 + 1) : ch0;
-    const double norm = GetParam(paramIdx)->GetNormalized();
-
-    // No-op if already in sync — avoids gratuitous SetDirty churn.
-    if (std::abs(GetParam(other)->GetNormalized() - norm) < 1e-9) return;
-
-    // Update the param itself (so DSP sees the new value when the toggle
-    // later flips to off, and so the host's automation lane shows both
-    // channels moving together) and push the new value into any UI knob
-    // currently bound to it. The host-side notification fires through
-    // SendParameterValueFromUI; the UI-side update needs the explicit
-    // SetValueFromDelegate because the calling knob doesn't have `other`
-    // in its mVals so iPlug2's automatic UpdatePeers path doesn't reach.
-    mPropagatingLinkChange = true;
-    SendParameterValueFromUI(other, norm);
-    if (auto* ui = GetUI()) {
-      ui->ForControlWithParam(other, [norm](iplug::igraphics::IControl* ctrl) {
-        ctrl->SetValueFromDelegate(norm);
-      });
-    }
-    mPropagatingLinkChange = false;
-    return;
-  }
+  iplug_helpers::PropagateLinkedParam(
+    *this, paramIdx, source, kLinkableCh0Bases, mPropagatingLinkChange);
 #endif
 }
 
@@ -1895,25 +1852,15 @@ void Curvessor::SetSelectedKnot(int knotIdx, int channel)
   const int chBase = base + 2 + channel * 4;
 
   // Rebind the side-panel controls to the newly-selected knot's params.
-  // SetParamIdx updates mVals[].idx but leaves mVals[].value at the
-  // PREVIOUSLY-bound param's value — so without an explicit pull the knob
-  // would briefly display the wrong value until the next host-driven
-  // SetValueFromDelegate cycle. Push the new param's normalized value
-  // into the control so the visual switch is instant.
-  auto rebind = [this](iplug::igraphics::IControl* ctrl, int paramIdx) {
-    if (!ctrl) return;
-    ctrl->SetParamIdx(paramIdx);
-    if (const IParam* p = GetParam(paramIdx)) {
-      ctrl->SetValue(p->GetNormalized());
-    }
-    ctrl->SetDirty(false);
-  };
-
-  rebind(mKnotPanelKnobX,          chBase + 0);
-  rebind(mKnotPanelKnobY,          chBase + 1);
-  rebind(mKnotPanelKnobTan,        chBase + 2);
-  rebind(mKnotPanelKnobSmoothness, chBase + 3);
-  rebind(mKnotPanelLink,           base + 1);
+  // iplug_helpers::RebindControlToParam updates SetParamIdx and pulls
+  // the new param's normalized value through immediately — without that
+  // pull the knob would briefly display the previously-bound value
+  // until the next host SetValueFromDelegate cycle.
+  iplug_helpers::RebindControlToParam(*this, mKnotPanelKnobX,          chBase + 0);
+  iplug_helpers::RebindControlToParam(*this, mKnotPanelKnobY,          chBase + 1);
+  iplug_helpers::RebindControlToParam(*this, mKnotPanelKnobTan,        chBase + 2);
+  iplug_helpers::RebindControlToParam(*this, mKnotPanelKnobSmoothness, chBase + 3);
+  iplug_helpers::RebindControlToParam(*this, mKnotPanelLink,           base + 1);
 
   if (auto* ui = GetUI()) {
     ui->SetAllControlsDirty();
