@@ -1898,14 +1898,20 @@ void Curvessor::OnIdle()
   mGainMeterSender.TransmitData(*this);
 
 #if IPLUG_EDITOR
+  // If the editor is closed, the cached side-panel knob / row-label
+  // pointers below are dangling (their controls were destroyed in
+  // IGraphicsNanoVG::OnViewDestroyed → RemoveAllControls). OnUIClose
+  // nulls them, but we still need this guard for the timer firing
+  // before OnUIClose has run (or in iPlug2 versions that don't call it).
+  auto* ui = GetUI();
+  if (!ui) return;
+
   // Force a periodic repaint of the spline editor so it picks up external
   // param changes — host automation, undo, edits via the knot-panel knobs,
   // anything that isn't a drag inside the spline editor itself. Cheap;
   // SetDirty just marks the control region invalid for the next frame.
-  if (auto* ui = GetUI()) {
-    if (auto* ctrl = ui->GetControlWithTag(kCtrlTagSplineEditor)) {
-      ctrl->SetDirty(false);
-    }
+  if (auto* ctrl = ui->GetControlWithTag(kCtrlTagSplineEditor)) {
+    ctrl->SetDirty(false);
   }
 
   // Sync the side-panel knobs (X / Y / Tan / Smooth / Link) to their
@@ -1938,6 +1944,24 @@ void Curvessor::OnIdle()
     mRowLabelL->SetStr(ms ? "Mid"  : "Left");
     mRowLabelR->SetStr(ms ? "Side" : "Right");
   }
+#endif
+}
+
+void Curvessor::OnUIClose()
+{
+  // IGraphics destroys all controls when the editor closes (see
+  // IGraphicsNanoVG::OnViewDestroyed -> RemoveAllControls). Our cached
+  // side-panel pointers would then dangle; OnIdle would dereference them
+  // on the next timer tick and crash. Null them here so the OnIdle guard
+  // can detect "no editor" cleanly.
+#if IPLUG_EDITOR
+  mKnotPanelKnobX          = nullptr;
+  mKnotPanelKnobY          = nullptr;
+  mKnotPanelKnobTan        = nullptr;
+  mKnotPanelKnobSmoothness = nullptr;
+  mKnotPanelLink           = nullptr;
+  mRowLabelL               = nullptr;
+  mRowLabelR               = nullptr;
 #endif
 }
 

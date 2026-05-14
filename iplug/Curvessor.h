@@ -104,6 +104,12 @@ public:
   // the meter controls via their ctrl tags.
   void OnIdle() override;
 
+  // Fires when the host closes the plugin editor. IGraphics destroys all
+  // controls on close (RemoveAllControls in OnViewDestroyed), so we must
+  // null our cached side-panel control pointers before the idle timer
+  // dereferences them — that path crashed Reaper on close.
+  void OnUIClose() override;
+
   // Linkable-pair propagation: when a ch0 or ch1 param changes and the
   // pair's _is_linked toggle is on, copy the change to the other channel
   // so both knobs stay in sync during a drag (and both stay in sync at
