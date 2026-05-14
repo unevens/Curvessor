@@ -6,6 +6,7 @@
 #include "SplineEditorDsp.hpp"   // juicy::GuiSpline (JUCE-free scalar eval)
 #include "iplug-helpers/controls/Palette.hpp"
 #include "iplug-helpers/controls/LightMarkerMeterControl.hpp"
+#include "iplug-helpers/layout/KnobCellLayout.hpp"
 using namespace iplug_helpers;
 #endif
 
@@ -995,47 +996,11 @@ Curvessor::Curvessor(const InstanceInfo& info)
       return r;
     };
 
-    // ---------- Knob+label+caption geometry helpers ----------
-    // A knob "cell" stacks three pieces top-down with 1 px gaps:
-    //   [bold name label, 12 px]
-    //   [disc,            36 × 36 (centred horizontally)]
-    //   [caption,         18 px — editable ICaptionControl at 15 pt text]
-    // The whole 68 px block is centred vertically inside the supplied cell.
-    // The caption replaces the value text that used to sit inside the knob
-    // widget; clicking it opens a text-entry box for the user to type a new
-    // value. Side-panel and matrix captions share the same 15 pt font so
-    // the LCD-style readouts look consistent across the plug.
-    constexpr float kKnobDiscW   = 36.f;
-    constexpr float kKnobDiscH   = 36.f;
-    constexpr float kKnobLabelH  = 18.f;  // 15 pt bold name label
-    constexpr float kKnobGap     = 1.f;
-    constexpr float kKnobCapH    = 18.f;  // 15 pt editable caption
-    constexpr float kKnobPairH   = kKnobLabelH + kKnobGap + kKnobDiscH
-                                  + kKnobGap + kKnobCapH;  // 74
-    // Matrix captions reuse the same 15 pt size — kept as its own constant
-    // because the matrix knob cell layout (no label, just disc + caption)
-    // independently sets the caption band height.
-    constexpr float kMatrixCapH  = 18.f;
-
-    auto knobDiscRectIn = [&](const IRECT& cell) {
-      const float pairT = cell.T + (cell.H() - kKnobPairH) * 0.5f;
-      const float discT = pairT + kKnobLabelH + kKnobGap;
-      const float cx = cell.MW();
-      return IRECT(cx - kKnobDiscW * 0.5f, discT,
-                   cx + kKnobDiscW * 0.5f, discT + kKnobDiscH);
-    };
-    auto knobLabelRectIn = [&](const IRECT& cell) {
-      const float pairT = cell.T + (cell.H() - kKnobPairH) * 0.5f;
-      // Use the full cell width for the label so long names like
-      // "Stereo Link" still fit. The disc stays 36 px wide and centred.
-      return IRECT(cell.L, pairT, cell.R, pairT + kKnobLabelH);
-    };
-    auto knobCaptionRectIn = [&](const IRECT& cell) {
-      const float pairT = cell.T + (cell.H() - kKnobPairH) * 0.5f;
-      const float capT  = pairT + kKnobLabelH + kKnobGap
-                        + kKnobDiscH + kKnobGap;
-      return IRECT(cell.L, capT, cell.R, capT + kKnobCapH);
-    };
+    // Knob+label+caption geometry helpers — kKnobDiscW/H, kKnobLabelH,
+    // kKnobGap, kKnobCapH, kKnobPairH, kMatrixCapH, and the
+    // KnobDiscRectIn / KnobLabelRectIn / KnobCaptionRectIn helpers —
+    // live in iplug-helpers/layout/KnobCellLayout.hpp and are pulled in
+    // via `using namespace iplug_helpers` at the top of this TU.
 
     // Selected-knot column (colA): 4 knob+label cells (58 tall = pair
     // height) + a Link knot toggle. Total: 58*4 + 4*4 + 22 = 254 px,
@@ -1048,10 +1013,10 @@ Curvessor::Curvessor(const InstanceInfo& info)
 
     // Pre-compute the knot-panel disc rects so both the resize and the
     // first-time-attach branches use identical geometry.
-    const IRECT skXDisc   = knobDiscRectIn(skXRect);
-    const IRECT skYDisc   = knobDiscRectIn(skYRect);
-    const IRECT skTanDisc = knobDiscRectIn(skTanRect);
-    const IRECT skSmDisc  = knobDiscRectIn(skSmRect);
+    const IRECT skXDisc   = KnobDiscRectIn(skXRect);
+    const IRECT skYDisc   = KnobDiscRectIn(skYRect);
+    const IRECT skTanDisc = KnobDiscRectIn(skTanRect);
+    const IRECT skSmDisc  = KnobDiscRectIn(skSmRect);
 
     // Globals column (colB) — Dario's grouping:
     //   1. Sidechain (toggle, first from the top)
@@ -1196,7 +1161,7 @@ Curvessor::Curvessor(const InstanceInfo& info)
     // Styles shared by selected-knot column, globals, and matrix.
     // - knobStyleNoLabel: matrix-size disc (36 px), no built-in label. Side
     //   panels add their own bold ITextControl directly above (via the
-    //   knobLabelRectIn helper) to keep the disc visually identical to the
+    //   KnobLabelRectIn helper) to keep the disc visually identical to the
     //   matrix knobs (Dario explicitly asked for this).
     // - toggleNameInButtonStyle: switch with no external label; the param
     //   name is drawn *inside* the button via offText/onText (both set to
@@ -1226,17 +1191,14 @@ Curvessor::Curvessor(const InstanceInfo& info)
 
     // Bold name label + 36 px disc + editable caption, all centred inside
     // `cell`. Returns the knob's IControl* so callers can keep handles for
-    // dynamic param rebinding (selected-knot column).
+    // dynamic param rebinding (selected-knot column). Body lives in
+    // iplug-helpers/layout/KnobCellLayout.hpp; this lambda just binds the
+    // Curvessor-specific styles.
     auto attachLabeledKnob =
       [&](const IRECT& cell, int paramIdx, const char* name) -> IControl* {
-        pGraphics->AttachControl(new ITextControl(
-          knobLabelRectIn(cell), name, kCurvessorStyle.labelText));
-        IControl* knob = pGraphics->AttachControl(new IVKnobControl(
-          knobDiscRectIn(cell), paramIdx, "", knobStyleNoLabel));
-        pGraphics->AttachControl(new ICaptionControl(
-          knobCaptionRectIn(cell), paramIdx, kSideCaptionText, kCaptionBg,
-          /*showParamLabel=*/true));
-        return knob;
+        return AttachLabeledKnob(pGraphics, cell, paramIdx, name,
+                                  kCurvessorStyle.labelText, knobStyleNoLabel,
+                                  kSideCaptionText, kCaptionBg);
       };
 
     // Selected-knot column — empty-label group frame plus a separate
