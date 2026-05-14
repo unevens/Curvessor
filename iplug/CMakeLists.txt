@@ -9,6 +9,16 @@ include(${IPLUG2_DIR}/iPlug2.cmake)
 
 find_package(iPlug2 REQUIRED)
 
+# Shared header-only helpers for Curvessor + Overdraw iPlug2 ports
+# (palette, light-marker meter control, layout helpers, etc.).
+if(NOT DEFINED IPLUG_HELPERS_DIR)
+  set(IPLUG_HELPERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../iplug-helpers"
+      CACHE PATH "Path to iplug-helpers")
+endif()
+if(NOT TARGET iplug-helpers)
+  add_subdirectory(${IPLUG_HELPERS_DIR} iplug-helpers)
+endif()
+
 # Roots of the JUCE-free pieces of Curvessor that we vendor in here. The
 # JUCE-bound files in Source/PluginProcessor.{h,cpp}, Source/PluginEditor.{h,cpp}
 # and the whole juicy/ tree are deliberately NOT compiled — Curvessor.cpp
@@ -78,6 +88,7 @@ foreach(_t IN LISTS _curvessor_format_targets)
       PFFFT_ENABLE_DOUBLE=1
       R8B_PFFFT_DOUBLE=1
       NOMINMAX=1)
+    target_link_libraries(${_t} PRIVATE iplug-helpers)
     # iPlug2's FindiPlug2.cmake forces CXX_STANDARD 17 on every format target
     # via iplug_configure_target; override here so Curvessor's C++20 DSP code
     # compiles (and the framework code along with it).

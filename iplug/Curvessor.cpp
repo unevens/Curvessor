@@ -4,6 +4,9 @@
 #if IPLUG_EDITOR
 #include "IControls.h"
 #include "SplineEditorDsp.hpp"   // juicy::GuiSpline (JUCE-free scalar eval)
+#include "iplug-helpers/controls/Palette.hpp"
+#include "iplug-helpers/controls/LightMarkerMeterControl.hpp"
+using namespace iplug_helpers;
 #endif
 
 #include <algorithm>
@@ -115,69 +118,11 @@ oversimple::OversamplingSettings MakeInitialOversamplingSettings()
 
 #if IPLUG_EDITOR
 
-// =============================================================================
-// Visual palette — "rack on a spacestation". Dark panel chassis, LCD-style
-// spline editor with a low-contrast teal grid. The actual chassis bitmap is
-// expected to be a future asset; these colours are picked to read well over
-// either a flat dark fill or such a bitmap.
-// =============================================================================
-
-// Chassis (panel) — used when no background image is loaded yet.
-static const IColor kPanelBg          (255,  14,  18,  24);
-static const IColor kPanelFrame       (255,  44,  56,  68);
-
-// LCD area (spline editor + meters).
-static const IColor kLcdBg            (255,   6,  12,  16);
-static const IColor kLcdFrame         (255,  60,  90, 105);
-static const IColor kLcdGridMajor     (255,  44,  72,  88);
-static const IColor kLcdGridMinor     (255,  22,  38,  48);
-static const IColor kLcdAxisLabel     (255,  90, 140, 158);
-static const IColor kLcdIdentityLine  (160,  60,  90, 105);
-
-// Spline content.
-static const IColor kLcdCurveCh0      (255,  80, 200, 230);  // bright cyan
-static const IColor kLcdCurveCh1      (255, 240, 170,  90);  // warm amber
-static const IColor kLcdKnotCh0       (255, 150, 220, 245);
-static const IColor kLcdKnotCh1       (255, 255, 200, 130);
-static const IColor kLcdKnotGhostCh0  (130,  80, 160, 200);
-static const IColor kLcdKnotGhostCh1  (130, 200, 130,  80);
-static const IColor kLcdKnotRing      (255,  10,  16,  22);
-static const IColor kLcdSelectedHalo  (255, 255, 255, 255);
-static const IColor kLcdTangentLine   (220, 220, 235, 200);
-static const IColor kLcdTangentHandle (255, 250, 220, 100);
-static const IColor kLcdLevelDotCh0   (255, 200, 240, 255);
-static const IColor kLcdLevelDotCh1   (255, 255, 220, 180);
-static const IColor kLcdGrLineCh0     (190, 130, 210, 240);
-static const IColor kLcdGrLineCh1     (190, 245, 190, 130);
-
-// Text styles.
-static const IText kTitleText(20, IColor(255, 200, 220, 230),
-                              nullptr, EAlign::Center);
-static const IText kVersionText(10, IColor(255, 110, 140, 155),
-                                nullptr, EAlign::Far);
-static const IText kLcdAxisLabelText(10, kLcdAxisLabel, nullptr, EAlign::Center);
-static const IText kLcdAxisLabelTextLeft(10, kLcdAxisLabel, nullptr, EAlign::Near);
-
-// Shared IVStyle for every Curvessor panel control — knobs, switches,
-// tabs, meters. Dark base, cyan accents, slim 1px frames.
-static const IVStyle kCurvessorStyle = DEFAULT_STYLE
-  .WithColor(kBG, IColor(255,  20,  26,  32))
-  .WithColor(kFG, IColor(255,  60, 110, 130))
-  .WithColor(kPR, IColor(255,  80, 200, 230))
-  .WithColor(kFR, IColor(255,  60,  85, 100))
-  .WithColor(kHL, IColor(255, 120, 180, 200))
-  .WithColor(kSH, IColor(255,   4,   8,  12))
-  .WithColor(kX1, IColor(255, 240, 170,  90))
-  .WithFrameThickness(1.f)
-  // Labels are the user-visible names sitting near each knob / switch. Slightly
-  // bolder than the value text so the param name reads first; the value text
-  // (knob readout, switch on/off when shown) stays in regular weight.
-  // Label / value text both at 15 pt so knob names, button face text, and
-  // matrix headers line up with the 15 pt editable caption readouts.
-  .WithLabelText(IText(15, IColor(255, 200, 220, 230),
-                       "Roboto-Bold", EAlign::Center))
-  .WithValueText(IText(15, IColor(255, 200, 220, 230),
-                       nullptr, EAlign::Center));
+// Palette + IVStyle + caption / header / row-label text styles live in
+// `iplug-helpers/controls/Palette.hpp` (see `using namespace iplug_helpers`
+// at the top of this file). The shared style was named `kCurvessorStyle`
+// here historically; alias to keep references in this TU readable.
+static const IVStyle& kCurvessorStyle = iplug_helpers::kPanelStyle;
 
 // =============================================================================
 // SplineControl — IGraphics control that draws Curvessor's gain curve and
@@ -846,63 +791,11 @@ private:
   }
 };
 
-// =============================================================================
-// CurvessorMeterControl — IVMeterControl with light-coloured dB markers.
-// Upstream's DrawMarkers hardcodes DEFAULT_TEXT (black) which is unreadable
-// on Curvessor's dark panel. We reimplement Draw() to use a light text style
-// for the "-24 dB" / "0 dB" / etc. tick labels alongside each meter.
-// =============================================================================
+// Light-marker meter alias — the class lives in iplug-helpers, kept
+// under its historical name in this TU so call sites don't need to
+// change.
 template<int MAXNC>
-class CurvessorMeterControl : public IVMeterControl<MAXNC>
-{
-  using Base = IVMeterControl<MAXNC>;
-public:
-  using Base::Base;  // inherit ctors
-
-  void Draw(IGraphics& g) override
-  {
-    this->DrawBackground(g, this->mRECT);
-    this->DrawWidget(g);
-    this->DrawLabel(g);
-
-    if (this->mResponse == Base::EResponse::Log)
-      DrawLightMarkers(g);
-
-    if (this->mStyle.drawFrame)
-      g.DrawRect(this->GetColor(kFR), this->mWidgetBounds, &this->mBlend,
-                 this->mStyle.frameThickness);
-  }
-
-private:
-  void DrawLightMarkers(IGraphics& g)
-  {
-    static const IText kMarkerText(11, IColor(255, 200, 220, 230),
-                                    nullptr, EAlign::Center);
-    const float lowPointAbs = std::fabs(this->mLowRangeDB);
-    const float rangeDB     = std::fabs(this->mHighRangeDB - this->mLowRangeDB);
-
-    for (auto pt : this->mMarkers)
-    {
-      const float linearPos = (pt + lowPointAbs) / rangeDB;
-      IRECT r = this->mWidgetBounds.FracRect(this->mDirection, linearPos);
-
-      if (this->mDirection == EDirection::Vertical) {
-        r.B = r.T + 10.f;
-        g.DrawLine(this->GetColor(kHL), r.L, r.T, r.R, r.T);
-      }
-      else {
-        r.L = r.R - 10.f;
-        g.DrawLine(this->GetColor(kHL), r.MW(), r.T, r.MW(), r.B);
-      }
-
-      if (this->mStyle.showValue) {
-        WDL_String str;
-        str.SetFormatted(32, "%i dB", pt);
-        g.DrawText(kMarkerText, str.Get(), r);
-      }
-    }
-  }
-};
+using CurvessorMeterControl = iplug_helpers::LightMarkerMeterControl<MAXNC>;
 
 #endif // IPLUG_EDITOR
 
