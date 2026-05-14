@@ -39,6 +39,7 @@ iplug_add_plugin(${PROJECT_NAME}
     ${OVERSIMPLE_DIR}/r8brain/pffft_double/pffft_double.c
   RESOURCES
     resources/fonts/Roboto-Regular.ttf
+    resources/fonts/Roboto-Bold.ttf
   FORMATS
     MINIMAL_PLUGINS
 )
