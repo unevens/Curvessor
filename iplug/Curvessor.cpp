@@ -119,11 +119,13 @@ oversimple::OversamplingSettings MakeInitialOversamplingSettings()
 
 #if IPLUG_EDITOR
 
-// Palette + IVStyle + caption / header / row-label text styles live in
+// Palette + caption / header / row-label text styles live in
 // `iplug-helpers/controls/Palette.hpp` (see `using namespace iplug_helpers`
-// at the top of this file). The shared style was named `kCurvessorStyle`
-// here historically; alias to keep references in this TU readable.
-static const IVStyle& kCurvessorStyle = iplug_helpers::kPanelStyle;
+// at the top of this file). The shared IVStyle ships as a factory
+// function so init order is well-defined in this TU (see
+// MakePanelStyle's comment in Palette.hpp for why); kCurvessorStyle is
+// the canonical TU-local copy, kept under its historical name.
+static const IVStyle kCurvessorStyle = iplug_helpers::MakePanelStyle();
 
 // =============================================================================
 // SplineControl — IGraphics control that draws Curvessor's gain curve and
