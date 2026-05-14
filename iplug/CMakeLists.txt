@@ -10,9 +10,12 @@ include(${IPLUG2_DIR}/iPlug2.cmake)
 find_package(iPlug2 REQUIRED)
 
 # Shared header-only helpers for Curvessor + Overdraw iPlug2 ports
-# (palette, light-marker meter control, layout helpers, etc.).
+# (palette, light-marker meter control, layout helpers, etc.). Default
+# is the in-tree submodule at <plugin_root>/iplug-helpers; the
+# IPLUG_HELPERS_DIR cache var lets a dev with a sibling-tree layout
+# (e.g. ~/dev/iplug-helpers/) point at that copy instead.
 if(NOT DEFINED IPLUG_HELPERS_DIR)
-  set(IPLUG_HELPERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../../iplug-helpers"
+  set(IPLUG_HELPERS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../iplug-helpers"
       CACHE PATH "Path to iplug-helpers")
 endif()
 if(NOT TARGET iplug-helpers)

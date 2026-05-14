@@ -13,3 +13,6 @@
 [submodule "iPlug2"]
 	path = iPlug2
 	url = https://github.com/iPlug2/iPlug2.git
+[submodule "iplug-helpers"]
+	path = iplug-helpers
+	url = https://github.com/unevens/iplug-helpers.git
