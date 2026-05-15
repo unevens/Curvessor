@@ -742,12 +742,12 @@ Curvessor::Curvessor(const InstanceInfo& info)
     // SetBaseValue(0.5) so the fill grows up from the centre for boost and
     // down from the centre for cut.
     const IVStyle meterStyle = kCurvessorStyle.WithDrawFrame(false);
-    pGraphics->AttachControl(
+    auto* levelMeter = static_cast<CurvessorMeterControl<2>*>(pGraphics->AttachControl(
       new CurvessorMeterControl<2>(levelMeterRect, "Level", meterStyle,
                                     EDirection::Vertical, {"L","R"}, 0,
                                     CurvessorMeterControl<2>::EResponse::Log,
                                     -60.f, 6.f),
-      kCtrlTagLevelMeter);
+      kCtrlTagLevelMeter));
     auto* gainMeter = static_cast<CurvessorMeterControl<2>*>(pGraphics->AttachControl(
       new CurvessorMeterControl<2>(gainMeterRect, "Gain", meterStyle,
                                     EDirection::Vertical, {"L","R"}, 0,
@@ -756,6 +756,13 @@ Curvessor::Curvessor(const InstanceInfo& info)
                                     {-24, -12, -6, 0, 6, 12, 24}),
       kCtrlTagGainMeter));
     gainMeter->SetBaseValue(0.5);
+    // Cache the meters so OnIdle can flip their per-track labels between
+    // "L"/"R" and "M"/"S" when the Mid-Side toggle changes — the meter
+    // values are already in the M/S domain in that mode because the DSP
+    // signal chain processes in M/S before the LR-restore at the end of
+    // ProcessBlock.
+    mLevelMeter = levelMeter;
+    mGainMeter  = gainMeter;
   };
 #endif
 }
@@ -1166,13 +1173,24 @@ void Curvessor::OnIdle()
   iplug_helpers::SyncControlFromParam(*this, mKnotPanelKnobSmoothness);
   iplug_helpers::SyncControlFromParam(*this, mKnotPanelLink);
 
-  // Matrix row labels: "Left"/"Right" in stereo mode, "Mid"/"Side" in M/S
-  // mode. SetStr is a no-op when the new string matches the old, so it's
-  // cheap to call every frame.
+  // Matrix row labels + meter per-track labels: "Left"/"Right" in stereo
+  // mode, "Mid"/"Side" in M/S mode (single-letter for the narrow meter
+  // bars). SetStr / SetTrackName are no-ops when the new string matches
+  // the old, so it's cheap to call every frame. The meters need no
+  // SetDirty here because the per-frame TransmitData already marks them
+  // dirty.
+  const bool ms = GetParam(kMidSide)->Bool();
   if (mRowLabelL && mRowLabelR) {
-    const bool ms = GetParam(kMidSide)->Bool();
     mRowLabelL->SetStr(ms ? "Mid"  : "Left");
     mRowLabelR->SetStr(ms ? "Side" : "Right");
+  }
+  if (mLevelMeter) {
+    mLevelMeter->SetTrackName(0, ms ? "M" : "L");
+    mLevelMeter->SetTrackName(1, ms ? "S" : "R");
+  }
+  if (mGainMeter) {
+    mGainMeter->SetTrackName(0, ms ? "M" : "L");
+    mGainMeter->SetTrackName(1, ms ? "S" : "R");
   }
 #endif
 }
@@ -1192,6 +1210,8 @@ void Curvessor::OnUIClose()
   mKnotPanelLink           = nullptr;
   mRowLabelL               = nullptr;
   mRowLabelR               = nullptr;
+  mLevelMeter              = nullptr;
+  mGainMeter               = nullptr;
 #endif
 }
 

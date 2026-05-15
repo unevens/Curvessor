@@ -12,10 +12,12 @@
 #include "ISender.h"
 
 // Forward declarations to keep IControls.h out of the plugin header — the
-// .cpp includes it directly when it needs the full ITextControl definition.
+// .cpp includes it directly when it needs the full ITextControl /
+// IVTrackControlBase definitions.
 namespace iplug {
 namespace igraphics {
   class ITextControl;
+  class IVTrackControlBase;
 }
 }
 
@@ -214,4 +216,8 @@ private:
   // toggle is on, kept in sync from OnIdle.
   iplug::igraphics::ITextControl* mRowLabelL = nullptr;
   iplug::igraphics::ITextControl* mRowLabelR = nullptr;
+  // Level + gain meter pointers — same M/S-aware label flip as the matrix
+  // row labels, applied via the meter's per-track SetTrackName.
+  iplug::igraphics::IVTrackControlBase* mLevelMeter = nullptr;
+  iplug::igraphics::IVTrackControlBase* mGainMeter  = nullptr;
 };
