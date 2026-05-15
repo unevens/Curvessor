@@ -1,5 +1,14 @@
 # Curvessor 2
 
+> **iPlug2 port in progress.** A re-port of Curvessor onto the
+> [iPlug2](https://github.com/iPlug2/iPlug2) framework — with a
+> modernized GUI (GPU-accelerated via NanoVG / Metal) and CLAP
+> support alongside AU + VST3 — lives on the
+> [`iplug2-port`](https://github.com/unevens/Curvessor/tree/iplug2-port)
+> branch. See that branch's README for build instructions specific
+> to the iPlug2 build. This `master` branch hosts the shipping
+> JUCE-based version described below.
+
 ![Curvessor GUI](Images/screenshot.jpg?raw=true 'screenshot')
 
 [Curvessor](https://www.unevens.net/curvessor.html) is an audio plug-in that implements a dynamic range processor in which **the response curve of each channel is an automatable spline**.
