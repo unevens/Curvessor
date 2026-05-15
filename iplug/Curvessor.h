@@ -188,22 +188,36 @@ private:
   // amplitudes (not dB) — IVMeterControl::EResponse::Log calls AmpToDB
   // internally and maps the result to [0,1] for the bar fill.
   //
-  //   mLevelMeterSender — input envelope (post-HP, post-stereo-link),
-  //                       drives both the "Input" meter widget AND the
-  //                       spline editor's "current input" dot.
+  // We send three meter streams and one curve-overlay stream:
+  //
+  //   mInputLevelSender — post-input-gain audio-path RMS, sampled in the
+  //                       M/S domain when M/S is on. This is what the
+  //                       "Input" meter shows: the level actually feeding
+  //                       the spline curve, in the same domain as the
+  //                       Output meter. Independent of HP-filter, envelope
+  //                       follower, and stereo-link, so the visual
+  //                       Output − Input = Gain relationship holds.
   //   mGainMeterSender  — gain reduction in linear amp (dB-converted in
   //                       the widget), drives the "Gain" meter widget.
-  //   mOutputLevelSender— wet output RMS sampled in the M/S domain when
-  //                       M/S is on (i.e. before MidSideToLeftRight), so
-  //                       the "Output" meter visibly drops when the
+  //   mOutputLevelSender— post-output-gain wet RMS sampled in the M/S
+  //                       domain when M/S is on. The "Output" meter
+  //                       visibly drops by the GR amount when the
   //                       compressor cuts a channel.
-  ISender<2> mLevelMeterSender;
+  //   mLevelMeterSender — env-follower output (post-HP, post-stereo-link),
+  //                       i.e. the X coordinate at which the curve is
+  //                       evaluated. Routed ONLY to the spline editor's
+  //                       "current input" dot — NOT to any meter widget,
+  //                       because that data is the wrong domain for a
+  //                       user-facing "input level" reading.
+  ISender<2> mInputLevelSender;
   ISender<2> mGainMeterSender;
   ISender<2> mOutputLevelSender;
+  ISender<2> mLevelMeterSender;
 
-  // Smoothed wet-output RMS² accumulator (per channel) for the "Output"
-  // meter. One-pole filtered at 10 Hz on each ProcessBlock; sqrt at
-  // sample-out time gives linear amplitude for the sender.
+  // Smoothed input + wet RMS² accumulators (per channel) for the Input
+  // and Output meters. One-pole filtered at 10 Hz on each ProcessBlock;
+  // sqrt at sample-out time gives linear amplitude for the senders.
+  std::array<double, 2> mInputLevelRms  { {0.0, 0.0} };
   std::array<double, 2> mOutputLevelRms { {0.0, 0.0} };
 #endif
 

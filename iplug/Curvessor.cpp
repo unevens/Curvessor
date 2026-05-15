@@ -832,6 +832,7 @@ void Curvessor::OnReset()
   for (int c = 0; c < 2; ++c) {
     mDsp->gainVuMeterBuffer[c] = 0.0;
     mDsp->levelVuMeterBuffer[c] = -200.0;
+    mInputLevelRms[c]  = 0.0;
     mOutputLevelRms[c] = 0.0;
     mDsp->stereoLink[c] = stereoLinkTarget;
     mDsp->inputGain[c]  = std::exp(kDbToLin * GetLinkable(kInputGain_ch0, c));
@@ -1031,6 +1032,26 @@ void Curvessor::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 
   ApplyGain(ioAudio, inputGainTarget, mDsp->inputGain, automationAlpha, nFrames);
 
+  // Input-level RMS: 10 Hz one-pole over (M/S-domain when M/S is on)
+  // ioAudio AFTER input gain, BEFORE upsampling / HP-filter / envelope-
+  // follower / stereo-link. This is the actual signal level feeding the
+  // spline curve in the same domain as the Output meter, so the user
+  // can read Output − Input = Gain off the three bars regardless of HP
+  // engagement or stereo-link blending (which only affect the curve
+  // lookup, not the audio path).
+  {
+    constexpr double kVuMeterFrequency = 10.0;
+    const double a = std::exp(-2.0 * M_PI * kVuMeterFrequency / sampleRate);
+    for (int c = 0; c < 2; ++c) {
+      double rms = mInputLevelRms[c];
+      for (int i = 0; i < nFrames; ++i) {
+        const double s = ioAudio[c][i];
+        rms = a * (rms - s * s) + s * s;
+      }
+      mInputLevelRms[c] = rms;
+    }
+  }
+
   const uint32_t numInputSamples = static_cast<uint32_t>(nFrames);
   mWetOversampling.prepareBuffers(numInputSamples);
   mDryOversampling.prepareBuffers(numInputSamples);
@@ -1161,20 +1182,29 @@ void Curvessor::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   // VU meter snapshot to GUI-readable atomics + queues. The atomics are kept
   // for any direct-poll consumer (e.g. a custom paint timer); the senders
   // feed the IVMeterControls via OnIdle drain.
-  ISenderData<2, float> inputData {kCtrlTagInputMeter,  2, 0};
-  ISenderData<2, float> gainData  {kCtrlTagGainMeter,   2, 0};
-  ISenderData<2, float> outputData{kCtrlTagOutputMeter, 2, 0};
+  //
+  //   inputData  → "Input"  meter (audio-path RMS, post-input-gain)
+  //   gainData   → "Gain"   meter (spline GR delta, dB-converted to amp)
+  //   outputData → "Output" meter (audio-path RMS, post-output-gain)
+  //   envData    → spline editor's "current input" dot (env-follower
+  //                output, i.e. the X coord on the curve)
+  ISenderData<2, float> inputData {kCtrlTagInputMeter,    2, 0};
+  ISenderData<2, float> gainData  {kCtrlTagGainMeter,     2, 0};
+  ISenderData<2, float> outputData{kCtrlTagOutputMeter,   2, 0};
+  ISenderData<2, float> envData   {kCtrlTagSplineEditor,  2, 0};
   for (int c = 0; c < 2; ++c) {
     mLevelVuMeterResults[c].store(static_cast<float>(mDsp->levelVuMeterBuffer[c]));
     mGainVuMeterResults[c].store(static_cast<float>(mDsp->gainVuMeterBuffer[c]));
     // IVMeterControl::EResponse::Log wants linear amplitude.
-    inputData.vals[c]  = static_cast<float>(std::pow(10.0, mDsp->levelVuMeterBuffer[c] / 20.0));
+    inputData.vals[c]  = static_cast<float>(std::sqrt(std::max(0.0, mInputLevelRms[c])));
     gainData.vals[c]   = static_cast<float>(std::pow(10.0, mDsp->gainVuMeterBuffer[c]  / 20.0));
     outputData.vals[c] = static_cast<float>(std::sqrt(std::max(0.0, mOutputLevelRms[c])));
+    envData.vals[c]    = static_cast<float>(std::pow(10.0, mDsp->levelVuMeterBuffer[c] / 20.0));
   }
-  mLevelMeterSender.PushData(inputData);
+  mInputLevelSender.PushData(inputData);
   mGainMeterSender.PushData(gainData);
   mOutputLevelSender.PushData(outputData);
+  mLevelMeterSender.PushData(envData);
 }
 
 #endif // IPLUG_DSP
@@ -1184,15 +1214,14 @@ void Curvessor::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 // (it just no-ops via SendControlMsgFromDelegate when there's no UI).
 void Curvessor::OnIdle()
 {
-  // Input-level packets go to both the "Input" meter widget and the
-  // spline editor — the editor uses them to plot the moving "current
-  // input" dot at the X coordinate of where on the curve the signal
-  // currently sits. TransmitDataToControlsWithTags overrides d.ctrlTag
-  // per recipient so the same queue payload reaches both controls.
-  mLevelMeterSender.TransmitDataToControlsWithTags(
-    *this, {kCtrlTagInputMeter, kCtrlTagSplineEditor});
+  // Each sender targets exactly one control. The Input meter and the
+  // spline editor's "current input" dot used to share data but no
+  // longer do — they live in different domains (audio-path RMS vs.
+  // curve-lookup envelope), so they need separate streams.
+  mInputLevelSender.TransmitData(*this);
   mGainMeterSender.TransmitData(*this);
   mOutputLevelSender.TransmitData(*this);
+  mLevelMeterSender.TransmitData(*this);
 
 #if IPLUG_EDITOR
   // If the editor is closed, the cached side-panel knob / row-label
