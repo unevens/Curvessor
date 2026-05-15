@@ -333,11 +333,22 @@ Curvessor::Curvessor(const InstanceInfo& info)
     // far right of that slice, NOT below it.
     const IRECT upperBand = bodyArea.GetFromTop(kSplineSize);
     const IRECT meterStrip = upperBand.GetFromRight(kMeterStripW);
-    // Gain on the left, Level on the right (Dario's preferred order).
-    const IRECT gainMeterRect  = meterStrip.GetFromLeft(kMeterStripW * 0.5f)
-                                            .GetPadded(-2, 0, -2, 0);
-    const IRECT levelMeterRect = meterStrip.GetFromRight(kMeterStripW * 0.5f)
-                                            .GetPadded(-2, 0, -2, 0);
+    // Three meters split the strip into thirds: Input / Gain / Output
+    // (signal-chain order, left to right). Each meter is padded 1 px on
+    // each side so the bars don't touch each other.
+    constexpr float kMeterCell = kMeterStripW / 3.f;  // 38 px each
+    const IRECT inputMeterRect = IRECT(meterStrip.L,
+                                        meterStrip.T,
+                                        meterStrip.L + kMeterCell,
+                                        meterStrip.B).GetPadded(-1, 0, -1, 0);
+    const IRECT gainMeterRect  = IRECT(meterStrip.L + kMeterCell,
+                                        meterStrip.T,
+                                        meterStrip.L + kMeterCell * 2.f,
+                                        meterStrip.B).GetPadded(-1, 0, -1, 0);
+    const IRECT outputMeterRect = IRECT(meterStrip.L + kMeterCell * 2.f,
+                                         meterStrip.T,
+                                         meterStrip.R,
+                                         meterStrip.B).GetPadded(-1, 0, -1, 0);
 
     // ---------- Side controls area ----------
     // To the right of the spline, within the spline's vertical range. Two
@@ -509,8 +520,9 @@ Curvessor::Curvessor(const InstanceInfo& info)
       pGraphics->GetControlWithTag(kCtrlTagTitle)->SetTargetAndDrawRECTs(titleBounds);
       pGraphics->GetControlWithTag(kCtrlTagVersionNumber)->SetTargetAndDrawRECTs(versionBounds);
       pGraphics->GetControlWithTag(kCtrlTagSplineEditor)->SetTargetAndDrawRECTs(splineEditorRect);
-      pGraphics->GetControlWithTag(kCtrlTagLevelMeter)->SetTargetAndDrawRECTs(levelMeterRect);
+      pGraphics->GetControlWithTag(kCtrlTagInputMeter)->SetTargetAndDrawRECTs(inputMeterRect);
       pGraphics->GetControlWithTag(kCtrlTagGainMeter)->SetTargetAndDrawRECTs(gainMeterRect);
+      pGraphics->GetControlWithTag(kCtrlTagOutputMeter)->SetTargetAndDrawRECTs(outputMeterRect);
       if (mKnotPanelKnobX)          mKnotPanelKnobX         ->SetTargetAndDrawRECTs(skXDisc);
       if (mKnotPanelKnobY)          mKnotPanelKnobY         ->SetTargetAndDrawRECTs(skYDisc);
       if (mKnotPanelKnobTan)        mKnotPanelKnobTan       ->SetTargetAndDrawRECTs(skTanDisc);
@@ -737,17 +749,25 @@ Curvessor::Curvessor(const InstanceInfo& info)
       mRowLabelR = lblR;
     }
 
-    // Meters — vertical, on the right edge of the plug. Each meter is
-    // 2-track (L+R) drawn as two adjacent vertical bars. Gain meter uses
-    // SetBaseValue(0.5) so the fill grows up from the centre for boost and
-    // down from the centre for cut.
+    // Three meters — vertical, on the right edge of the plug, arranged in
+    // signal-chain order: Input level (pre-compression envelope), Gain
+    // reduction (with SetBaseValue(0.5) so the fill grows up from centre
+    // for boost / down for cut), Output level (post-compression wet RMS).
+    //
+    // The Input meter shares its data with the spline editor's "current
+    // input" dot via OnIdle's TransmitDataToControlsWithTags — it's the
+    // X-axis coordinate of where on the curve the signal currently sits.
+    // The Output meter is the one that drops 24 dB when the compressor
+    // cuts a channel by 24 dB; it's sampled post-wet/dry/output-gain in
+    // M/S domain (when M/S is on, before MidSideToLeftRight), so its
+    // per-track labels flip to M/S in M/S mode like the Input meter.
     const IVStyle meterStyle = kCurvessorStyle.WithDrawFrame(false);
-    auto* levelMeter = static_cast<CurvessorMeterControl<2>*>(pGraphics->AttachControl(
-      new CurvessorMeterControl<2>(levelMeterRect, "Level", meterStyle,
+    auto* inputMeter = static_cast<CurvessorMeterControl<2>*>(pGraphics->AttachControl(
+      new CurvessorMeterControl<2>(inputMeterRect, "Input", meterStyle,
                                     EDirection::Vertical, {"L","R"}, 0,
                                     CurvessorMeterControl<2>::EResponse::Log,
                                     -60.f, 6.f),
-      kCtrlTagLevelMeter));
+      kCtrlTagInputMeter));
     auto* gainMeter = static_cast<CurvessorMeterControl<2>*>(pGraphics->AttachControl(
       new CurvessorMeterControl<2>(gainMeterRect, "Gain", meterStyle,
                                     EDirection::Vertical, {"L","R"}, 0,
@@ -756,13 +776,20 @@ Curvessor::Curvessor(const InstanceInfo& info)
                                     {-24, -12, -6, 0, 6, 12, 24}),
       kCtrlTagGainMeter));
     gainMeter->SetBaseValue(0.5);
+    auto* outputMeter = static_cast<CurvessorMeterControl<2>*>(pGraphics->AttachControl(
+      new CurvessorMeterControl<2>(outputMeterRect, "Output", meterStyle,
+                                    EDirection::Vertical, {"L","R"}, 0,
+                                    CurvessorMeterControl<2>::EResponse::Log,
+                                    -60.f, 6.f),
+      kCtrlTagOutputMeter));
     // Cache the meters so OnIdle can flip their per-track labels between
-    // "L"/"R" and "M"/"S" when the Mid-Side toggle changes — the meter
-    // values are already in the M/S domain in that mode because the DSP
-    // signal chain processes in M/S before the LR-restore at the end of
+    // "L"/"R" and "M"/"S" when the Mid-Side toggle changes — meter values
+    // are already in the M/S domain in that mode because the DSP signal
+    // chain processes in M/S before the LR-restore at the end of
     // ProcessBlock.
-    mLevelMeter = levelMeter;
-    mGainMeter  = gainMeter;
+    mInputMeter  = inputMeter;
+    mGainMeter   = gainMeter;
+    mOutputMeter = outputMeter;
   };
 #endif
 }
@@ -805,6 +832,7 @@ void Curvessor::OnReset()
   for (int c = 0; c < 2; ++c) {
     mDsp->gainVuMeterBuffer[c] = 0.0;
     mDsp->levelVuMeterBuffer[c] = -200.0;
+    mOutputLevelRms[c] = 0.0;
     mDsp->stereoLink[c] = stereoLinkTarget;
     mDsp->inputGain[c]  = std::exp(kDbToLin * GetLinkable(kInputGain_ch0, c));
     mDsp->outputGain[c] = std::exp(kDbToLin * GetLinkable(kOutputGain_ch0, c));
@@ -1107,6 +1135,25 @@ void Curvessor::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
     wetOutput.deinterleave(ioAudio, 2, nFrames);
   }
 
+  // Output-level RMS: 10 Hz one-pole over (M/S-domain when M/S) ioAudio.
+  // Sampled here, after the wet/dry-mix + output-gain pass and after the
+  // bypass deinterleave, so all signal-paths (compressed wet, bypass
+  // dry-passthrough) feed the same meter; sampled BEFORE the M/S → L/R
+  // restore so the per-channel readout matches the DSP domain the user
+  // is operating in. Matches the time constant Overdraw uses.
+  {
+    constexpr double kVuMeterFrequency = 10.0;
+    const double a = std::exp(-2.0 * M_PI * kVuMeterFrequency / sampleRate);
+    for (int c = 0; c < 2; ++c) {
+      double rms = mOutputLevelRms[c];
+      for (int i = 0; i < nFrames; ++i) {
+        const double s = ioAudio[c][i];
+        rms = a * (rms - s * s) + s * s;
+      }
+      mOutputLevelRms[c] = rms;
+    }
+  }
+
   if (isMidSide) {
     MidSideToLeftRight(ioAudio, nFrames);
   }
@@ -1114,17 +1161,20 @@ void Curvessor::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
   // VU meter snapshot to GUI-readable atomics + queues. The atomics are kept
   // for any direct-poll consumer (e.g. a custom paint timer); the senders
   // feed the IVMeterControls via OnIdle drain.
-  ISenderData<2, float> levelData{kCtrlTagLevelMeter, 2, 0};
-  ISenderData<2, float> gainData{kCtrlTagGainMeter, 2, 0};
+  ISenderData<2, float> inputData {kCtrlTagInputMeter,  2, 0};
+  ISenderData<2, float> gainData  {kCtrlTagGainMeter,   2, 0};
+  ISenderData<2, float> outputData{kCtrlTagOutputMeter, 2, 0};
   for (int c = 0; c < 2; ++c) {
     mLevelVuMeterResults[c].store(static_cast<float>(mDsp->levelVuMeterBuffer[c]));
     mGainVuMeterResults[c].store(static_cast<float>(mDsp->gainVuMeterBuffer[c]));
     // IVMeterControl::EResponse::Log wants linear amplitude.
-    levelData.vals[c] = static_cast<float>(std::pow(10.0, mDsp->levelVuMeterBuffer[c] / 20.0));
-    gainData.vals[c]  = static_cast<float>(std::pow(10.0, mDsp->gainVuMeterBuffer[c]  / 20.0));
+    inputData.vals[c]  = static_cast<float>(std::pow(10.0, mDsp->levelVuMeterBuffer[c] / 20.0));
+    gainData.vals[c]   = static_cast<float>(std::pow(10.0, mDsp->gainVuMeterBuffer[c]  / 20.0));
+    outputData.vals[c] = static_cast<float>(std::sqrt(std::max(0.0, mOutputLevelRms[c])));
   }
-  mLevelMeterSender.PushData(levelData);
+  mLevelMeterSender.PushData(inputData);
   mGainMeterSender.PushData(gainData);
+  mOutputLevelSender.PushData(outputData);
 }
 
 #endif // IPLUG_DSP
@@ -1134,13 +1184,15 @@ void Curvessor::ProcessBlock(sample** inputs, sample** outputs, int nFrames)
 // (it just no-ops via SendControlMsgFromDelegate when there's no UI).
 void Curvessor::OnIdle()
 {
-  // Level meter packets go to both the meter widget and the spline editor —
-  // the editor uses them to plot a moving "current input" dot on the curve.
-  // TransmitDataToControlsWithTags overrides d.ctrlTag per recipient so the
-  // same queue payload reaches both controls.
+  // Input-level packets go to both the "Input" meter widget and the
+  // spline editor — the editor uses them to plot the moving "current
+  // input" dot at the X coordinate of where on the curve the signal
+  // currently sits. TransmitDataToControlsWithTags overrides d.ctrlTag
+  // per recipient so the same queue payload reaches both controls.
   mLevelMeterSender.TransmitDataToControlsWithTags(
-    *this, {kCtrlTagLevelMeter, kCtrlTagSplineEditor});
+    *this, {kCtrlTagInputMeter, kCtrlTagSplineEditor});
   mGainMeterSender.TransmitData(*this);
+  mOutputLevelSender.TransmitData(*this);
 
 #if IPLUG_EDITOR
   // If the editor is closed, the cached side-panel knob / row-label
@@ -1184,14 +1236,14 @@ void Curvessor::OnIdle()
     mRowLabelL->SetStr(ms ? "Mid"  : "Left");
     mRowLabelR->SetStr(ms ? "Side" : "Right");
   }
-  if (mLevelMeter) {
-    mLevelMeter->SetTrackName(0, ms ? "M" : "L");
-    mLevelMeter->SetTrackName(1, ms ? "S" : "R");
-  }
-  if (mGainMeter) {
-    mGainMeter->SetTrackName(0, ms ? "M" : "L");
-    mGainMeter->SetTrackName(1, ms ? "S" : "R");
-  }
+  auto flipTrackLabels = [ms](iplug::igraphics::IVTrackControlBase* meter) {
+    if (!meter) return;
+    meter->SetTrackName(0, ms ? "M" : "L");
+    meter->SetTrackName(1, ms ? "S" : "R");
+  };
+  flipTrackLabels(mInputMeter);
+  flipTrackLabels(mGainMeter);
+  flipTrackLabels(mOutputMeter);
 #endif
 }
 
@@ -1210,8 +1262,9 @@ void Curvessor::OnUIClose()
   mKnotPanelLink           = nullptr;
   mRowLabelL               = nullptr;
   mRowLabelR               = nullptr;
-  mLevelMeter              = nullptr;
+  mInputMeter              = nullptr;
   mGainMeter               = nullptr;
+  mOutputMeter             = nullptr;
 #endif
 }
 

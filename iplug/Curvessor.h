@@ -89,8 +89,9 @@ enum ECtrlTags
 {
   kCtrlTagTitle = 0,
   kCtrlTagVersionNumber,
-  kCtrlTagLevelMeter,
+  kCtrlTagInputMeter,
   kCtrlTagGainMeter,
+  kCtrlTagOutputMeter,
   kCtrlTagSplineEditor,
 };
 
@@ -186,8 +187,24 @@ private:
   // Cross-thread queues for the IVMeterControl widgets. Carrying linear
   // amplitudes (not dB) — IVMeterControl::EResponse::Log calls AmpToDB
   // internally and maps the result to [0,1] for the bar fill.
+  //
+  //   mLevelMeterSender — input envelope (post-HP, post-stereo-link),
+  //                       drives both the "Input" meter widget AND the
+  //                       spline editor's "current input" dot.
+  //   mGainMeterSender  — gain reduction in linear amp (dB-converted in
+  //                       the widget), drives the "Gain" meter widget.
+  //   mOutputLevelSender— wet output RMS sampled in the M/S domain when
+  //                       M/S is on (i.e. before MidSideToLeftRight), so
+  //                       the "Output" meter visibly drops when the
+  //                       compressor cuts a channel.
   ISender<2> mLevelMeterSender;
   ISender<2> mGainMeterSender;
+  ISender<2> mOutputLevelSender;
+
+  // Smoothed wet-output RMS² accumulator (per channel) for the "Output"
+  // meter. One-pole filtered at 10 Hz on each ProcessBlock; sqrt at
+  // sample-out time gives linear amplitude for the sender.
+  std::array<double, 2> mOutputLevelRms { {0.0, 0.0} };
 #endif
 
 public:
@@ -216,8 +233,11 @@ private:
   // toggle is on, kept in sync from OnIdle.
   iplug::igraphics::ITextControl* mRowLabelL = nullptr;
   iplug::igraphics::ITextControl* mRowLabelR = nullptr;
-  // Level + gain meter pointers — same M/S-aware label flip as the matrix
-  // row labels, applied via the meter's per-track SetTrackName.
-  iplug::igraphics::IVTrackControlBase* mLevelMeter = nullptr;
-  iplug::igraphics::IVTrackControlBase* mGainMeter  = nullptr;
+  // Meter pointers — same M/S-aware label flip as the matrix row labels,
+  // applied via the meter's per-track SetTrackName from OnIdle. All three
+  // meters' per-track labels flip together: in M/S mode the DSP processes
+  // (mid, side), so each meter's channels are also mid/side.
+  iplug::igraphics::IVTrackControlBase* mInputMeter  = nullptr;
+  iplug::igraphics::IVTrackControlBase* mGainMeter   = nullptr;
+  iplug::igraphics::IVTrackControlBase* mOutputMeter = nullptr;
 };
